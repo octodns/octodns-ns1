@@ -73,6 +73,30 @@ All octoDNS record types are supported.
 
 Ns1Provider supports dynamic records.
 
+#### Health Check Options
+
+See https://github.com/octodns/octodns/blob/master/docs/dynamic_records.md#health-checks for information on health checking for dynamic records. Ns1Provider supports the following options:
+
+| Key  | Description | Default |
+|--|--|--|
+| policy | One of:<ol><li>`all` - down if every region is down</li><li>`quorum` - down if majority regions are down</li><li>`one` - down if any region is down</ol> | `quorum` |
+| frequency | Frequency (in seconds) of health-check | 60 |
+| connect_timeout | Timeout (in seconds) before we give up trying to connect | 2 |
+| response_timeout | Timeout (in seconds) after connecting to wait for output | 10 |
+| rapid_recheck | Enable or disable a second, automatic verification test before changing the status of a host. Enabling this option can help prevent false positives. | False |
+
+```yaml
+---
+  octodns:
+    ns1:
+      healthcheck:
+        policy: quorum
+        frequency: 60
+        connect_timeout: 2
+        response_timeout: 10
+        rapid_recheck: True
+```
+
 ### Developement
 
 See the [/script/](/script/) directory for some tools to help with the development process. They generally follow the [Script to rule them all](https://github.com/github/scripts-to-rule-them-all) pattern. Most useful is `./script/bootstrap` which will create a venv and install both the runtime and development related requirements. It will also hook up a pre-commit hook that covers most of what's run by CI.
