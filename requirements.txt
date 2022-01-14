@@ -2,7 +2,6 @@ PyYAML==6.0
 attrs==21.4.0
 certifi==2021.10.8
 charset-normalizer==2.0.9
-coverage==6.2
 dnspython==2.1.0
 fqdn==1.5.1
 idna==3.3

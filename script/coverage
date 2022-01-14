@@ -34,15 +34,19 @@ SOURCE_DIR="octodns_ns1/"
 
 # Don't allow disabling coverage
 grep -r -I --line-number "# pragma: +no.*cover" $SOURCE_DIR && {
-  echo "Code coverage should not be disabled"
-  exit 1
+    echo "Code coverage should not be disabled"
+    exit 1
 }
 
-coverage run --branch --source=$SOURCE_DIR "$(command -v nosetests)" --with-no-network --with-xunit "$@"
-coverage html
-coverage xml
-coverage report --show-missing
-coverage report | grep ^TOTAL | grep -qv 100% && {
-    echo "Incomplete code coverage" >&2
-    exit 1
-} || echo "Code coverage 100%"
+export PYTHONPATH=.:$PYTHONPATH
+
+pytest \
+  --disable-network \
+  --cov-reset \
+  --cov=$SOURCE_DIR \
+  --cov-fail-under=100 \
+  --cov-report=html \
+  --cov-report=xml \
+  --cov-report=term \
+  --cov-branch \
+  "$@"

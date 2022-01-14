@@ -31,7 +31,7 @@ setup(
     url='https://github.com/octodns/octodns-ns1',
     version=version(),
     tests_require=[
-        'nose',
-        'nose-no-network',
+        'pytest',
+        'pytest-network',
     ],
 )
