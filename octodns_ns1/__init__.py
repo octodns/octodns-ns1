@@ -4,7 +4,8 @@
 
 from logging import getLogger
 from itertools import chain
-from collections import Mapping, OrderedDict, defaultdict
+from collections.abc import Mapping
+from collections import OrderedDict, defaultdict
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
 from pycountry_convert import country_alpha2_to_continent_code
@@ -262,9 +263,9 @@ class Ns1Client(object):
                 if tries <= 1:
                     raise
                 period = float(e.period)
-                self.log.warn('rate limit encountered, pausing '
-                              'for %ds and trying again, %d remaining',
-                              period, tries)
+                self.log.warning('rate limit encountered, pausing '
+                                 'for %ds and trying again, %d remaining',
+                                 period, tries)
                 sleep(period)
                 tries -= 1
 
@@ -761,9 +762,9 @@ class Ns1Provider(BaseProvider):
             if 'pool:' in first_answer_note:
                 return self._data_for_dynamic(_type, record)
             # If not, it can't be parsed. Let it be an empty record
-            self.log.warn('Cannot parse %s dynamic record due to missing '
-                          'pool name in first answer note, treating it as '
-                          'an empty record', record['domain'])
+            self.log.warning('Cannot parse %s dynamic record due to missing '
+                             'pool name in first answer note, treating it as '
+                             'an empty record', record['domain'])
             value = None
         else:
             try:
@@ -1132,8 +1133,8 @@ class Ns1Provider(BaseProvider):
 
             feed_id = self._client.feeds_for_monitors.get(monitor_id)
             if feed_id is None:
-                self.log.warn('_monitor_sync: %s (%s) missing feed, creating',
-                              existing['name'], monitor_id)
+                self.log.warning('_monitor_sync: %s (%s) missing feed, '
+                                 'creating', existing['name'], monitor_id)
                 feed_id = self._feed_create(existing)
         else:
             self.log.debug('_monitor_sync:   needs create')
