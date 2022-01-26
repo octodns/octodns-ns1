@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
 
 def descriptions():
@@ -25,13 +25,16 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     name='octodns-ns1',
-    packages=('octodns_ns1',),
+    packages=find_packages(),
     python_requires='>=3.6',
-    install_requires=('octodns>=0.9.14', 'ns1_python>=0.17.1'),
+    install_requires=(
+        'octodns>=0.9.14',
+        'ns1_python>=0.17.1',
+    ),
     url='https://github.com/octodns/octodns-ns1',
     version=version(),
-    tests_require=[
+    tests_require=(
         'pytest',
         'pytest-network',
-    ],
+    ),
 )
