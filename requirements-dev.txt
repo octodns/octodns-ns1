@@ -9,8 +9,7 @@ pep517==0.12.0
 pkginfo==1.8.2
 pycodestyle==2.6.0
 pyflakes==2.2.0
-pytest
-pytest-network
+pytest-network==0.0.1
 readme-renderer==32.0
 requests-toolbelt==0.9.1
 rfc3986==1.5.0
