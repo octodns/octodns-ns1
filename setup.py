@@ -30,6 +30,7 @@ setup(
     install_requires=(
         'octodns>=0.9.14',
         'ns1_python>=0.17.1',
+        'pycountry-convert>=0.7.2',
     ),
     url='https://github.com/octodns/octodns-ns1',
     version=version(),
