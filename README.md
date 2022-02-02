@@ -27,7 +27,7 @@ octodns_ns1==0.0.1
 ```
 # Start with the latest/specific versions and don't just copy what's here
 -e git+https://git@github.com/octodns/octodns.git@9da19749e28f68407a1c246dfdf65663cdc1c422#egg=octodns
--e git+https://git@github.com/octodns/octodns_ns1.git@ec9661f8b335241ae4746eea467a8509205e6a30#egg=octodns_ns1
+-e git+https://git@github.com/octodns/octodns-ns1.git@ec9661f8b335241ae4746eea467a8509205e6a30#egg=octodns_ns1
 ```
 
 ### Configuration
