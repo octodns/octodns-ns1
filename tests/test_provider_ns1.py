@@ -335,8 +335,7 @@ class TestNs1Provider(TestCase):
             desired.add_record(r)
 
         plan = provider.plan(desired)
-        # everything except the root NS
-        expected_n = len(self.expected) - 1
+        expected_n = len(self.expected)
         self.assertEqual(expected_n, len(plan.changes))
         self.assertTrue(plan.exists)
 
@@ -389,6 +388,9 @@ class TestNs1Provider(TestCase):
             call('unit.tests', 'unit.tests', 'MX', answers=[
                 (10, 'mx1.unit.tests.'), (20, 'mx2.unit.tests.')
             ], ttl=35),
+            call('unit.tests', 'unit.tests', 'NS', answers=[
+                'ns1.unit.tests.', 'ns2.unit.tests.',
+            ], ttl=37),
             call('unit.tests', '1.2.3.4.unit.tests', 'PTR', answers=[
                 'one.one.one.one.', 'two.two.two.two.',
             ], ttl=42),
