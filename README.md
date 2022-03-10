@@ -69,6 +69,10 @@ providers:
 
 All octoDNS record types are supported.
 
+#### Root NS Records
+
+Ns1Provider supports full root NS record management.
+
 #### Dynamic
 
 Ns1Provider supports dynamic records.
