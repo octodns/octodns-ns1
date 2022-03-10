@@ -39,6 +39,7 @@ setup(
         'octodns>=0.9.16',
         'ns1_python>=0.17.1',
         'pycountry-convert>=0.7.2',
+        'requests>=2.27.1',
     ),
     license='MIT',
     long_description=long_description,
