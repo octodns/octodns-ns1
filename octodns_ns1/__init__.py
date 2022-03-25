@@ -874,7 +874,7 @@ class Ns1Provider(BaseProvider):
                                       'SRV']:
                     record['short_answers'] = [
                         _ensure_endswith_dot(a)
-                        for a in record['short_answers']
+                        for a in record.get('short_answers', [])
                     ]
 
                 if record.get('tier', 1) > 1:

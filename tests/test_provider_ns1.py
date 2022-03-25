@@ -3,6 +3,7 @@
 #
 
 from collections import defaultdict
+from logging import getLogger
 from ns1.rest.errors import AuthException, RateLimitException, \
     ResourceException
 from unittest import TestCase
@@ -197,7 +198,9 @@ class TestNs1Provider(TestCase):
         def reset():
             provider._client.reset_caches()
             zone_retrieve_mock.reset_mock()
+            zone_retrieve_mock.side_effect = None
             record_retrieve_mock.reset_mock()
+            record_retrieve_mock.side_effect = None
 
         # Bad auth
         reset()
@@ -226,29 +229,31 @@ class TestNs1Provider(TestCase):
         self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
         self.assertFalse(exists)
 
+        geo_record = {
+            "domain": "geo.unit.tests",
+            "zone": "unit.tests",
+            "type": "A",
+            "answers": [
+                {'answer': ['1.1.1.1'], 'meta': {}},
+                {'answer': ['1.2.3.4'],
+                 'meta': {'ca_province': ['ON']}},
+                {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
+                {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
+                {'answer': ['4.5.6.7'],
+                 'meta': {'iso_region_code': ['NA-US-WA']}},
+            ],
+            'tier': 3,
+            'ttl': 34,
+        }
+
         # Existing zone w/o records
         reset()
         ns1_zone = {
-            'records': [{
-                "domain": "geo.unit.tests",
-                "zone": "unit.tests",
-                "type": "A",
-                "answers": [
-                    {'answer': ['1.1.1.1'], 'meta': {}},
-                    {'answer': ['1.2.3.4'],
-                     'meta': {'ca_province': ['ON']}},
-                    {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
-                    {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
-                    {'answer': ['4.5.6.7'],
-                     'meta': {'iso_region_code': ['NA-US-WA']}},
-                ],
-                'tier': 3,
-                'ttl': 34,
-            }],
+            'records': [geo_record],
         }
         zone_retrieve_mock.side_effect = [ns1_zone]
         # Its tier 3 so we'll do a full lookup
-        record_retrieve_mock.side_effect = ns1_zone['records']
+        record_retrieve_mock.side_effect = [geo_record]
         zone = Zone('unit.tests.', [])
         provider.populate(zone)
         self.assertEqual(1, len(zone.records))
@@ -259,26 +264,11 @@ class TestNs1Provider(TestCase):
         # Existing zone w/records
         reset()
         ns1_zone = {
-            'records': self.ns1_records + [{
-                "domain": "geo.unit.tests",
-                "zone": "unit.tests",
-                "type": "A",
-                "answers": [
-                    {'answer': ['1.1.1.1'], 'meta': {}},
-                    {'answer': ['1.2.3.4'],
-                     'meta': {'ca_province': ['ON']}},
-                    {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
-                    {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
-                    {'answer': ['4.5.6.7'],
-                     'meta': {'iso_region_code': ['NA-US-WA']}},
-                ],
-                'tier': 3,
-                'ttl': 34,
-            }],
+            'records': self.ns1_records + [geo_record],
         }
         zone_retrieve_mock.side_effect = [ns1_zone]
         # Its tier 3 so we'll do a full lookup
-        record_retrieve_mock.side_effect = ns1_zone['records']
+        record_retrieve_mock.side_effect = [geo_record]
         zone = Zone('unit.tests.', [])
         provider.populate(zone)
         self.assertEqual(self.expected, zone.records)
@@ -294,30 +284,90 @@ class TestNs1Provider(TestCase):
                 'ttl': 42,
                 'short_answers': ['unsupported'],
                 'domain': 'unsupported.unit.tests.',
-            }, {
-                "domain": "geo.unit.tests",
-                "zone": "unit.tests",
-                "type": "A",
-                "answers": [
-                    {'answer': ['1.1.1.1'], 'meta': {}},
-                    {'answer': ['1.2.3.4'],
-                     'meta': {'ca_province': ['ON']}},
-                    {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
-                    {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
-                    {'answer': ['4.5.6.7'],
-                     'meta': {'iso_region_code': ['NA-US-WA']}},
-                ],
-                'tier': 3,
-                'ttl': 34,
-            }],
+            }, geo_record],
         }
         zone_retrieve_mock.side_effect = [ns1_zone]
+        record_retrieve_mock.side_effect = [geo_record]
         zone = Zone('unit.tests.', [])
         provider.populate(zone)
         self.assertEqual(self.expected, zone.records)
         self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
         record_retrieve_mock.assert_has_calls([call('unit.tests',
                                                     'geo.unit.tests', 'A')])
+
+        # Test handling of record with unsupported filter chains
+        # cc https://github.com/octodns/octodns-ns1/issues/17
+        reset()
+        ns1_zone = {
+            'records': [{
+                "domain": "unsupported.unit.tests",
+                "zone": "unit.tests",
+                "id": "123",
+                "use_client_subnet": True,
+                "answers": [{
+                    "answer": [
+                        "FOO"
+                    ],
+                    "meta": {
+                        "georegion": [
+                            "US-EAST"
+                        ]
+                    },
+                    "id": "234"
+                }, {
+                    "answer": [
+                        "BAR"
+                    ],
+                    "meta": {
+                        "georegion": [
+                            "EUROPE"
+                        ]
+                    },
+                    "id": "345"
+                }],
+                "override_ttl": False,
+                "regions": {},
+                "meta": {},
+                "link": None,
+                "filters": [{
+                    "filter": "select_first_n",
+                    "config": {
+                        "N": "1"
+                    }
+                }],
+                "ttl": 3600,
+                "tier": 2,
+                "type": "CNAME",
+                "networks": [
+                    0
+                ]
+            }],
+        }
+        zone_retrieve_mock.side_effect = [ns1_zone]
+        # Its tier 2 so we'll do a full lookup
+        record_retrieve_mock.side_effect = ns1_zone['records']
+        zone = Zone('unit.tests.', [])
+        provider.populate(zone, lenient=True)
+        self.assertEqual(set([
+            Record.new(zone, 'unsupported', {
+                'type': 'CNAME',
+                'ttl': 3600,
+                'value': None,
+            }, lenient=True)
+        ]), zone.records)
+        self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
+        record_retrieve_mock.assert_has_calls([call('unit.tests',
+                                                    'unsupported.unit.tests',
+                                                    'CNAME')])
+        # make sure we logged about the problem, this is kind of hacky so it's
+        # possible the test will eventually fail b/c something underlying has
+        # changed
+        log_handler = getLogger().handlers[-1]
+        self.assertEqual(3, len(log_handler.records))
+        log_record = log_handler.records[0]
+        self.assertEqual('Cannot parse unsupported.unit.tests dynamic record '
+                         'due to missing pool name in first answer note, '
+                         'treating it as an empty record', log_record.message)
 
     @patch('ns1.rest.records.Records.delete')
     @patch('ns1.rest.records.Records.update')
