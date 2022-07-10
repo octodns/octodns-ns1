@@ -12,6 +12,7 @@ from pycountry_convert import country_alpha2_to_continent_code
 from time import sleep
 from uuid import uuid4
 
+from octodns.idna import idna_decode, idna_encode
 from octodns.record import Record, Update
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
@@ -231,27 +232,37 @@ class Ns1Client(object):
 
     @update_record_cache
     def records_create(self, zone, domain, _type, **params):
-        return self._try(self._records.create, zone, domain, _type, **params)
+        idomain = idna_encode(domain)
+        izone = idna_encode(zone)
+        return self._try(self._records.create, izone, idomain, _type, **params)
 
     @update_record_cache
     def records_delete(self, zone, domain, _type):
-        return self._try(self._records.delete, zone, domain, _type)
+        idomain = idna_encode(domain)
+        izone = idna_encode(zone)
+        return self._try(self._records.delete, izone, idomain, _type)
 
     @read_or_set_record_cache
     def records_retrieve(self, zone, domain, _type):
-        return self._try(self._records.retrieve, zone, domain, _type)
+        idomain = idna_encode(domain)
+        izone = idna_encode(zone)
+        return self._try(self._records.retrieve, izone, idomain, _type)
 
     @update_record_cache
     def records_update(self, zone, domain, _type, **params):
-        return self._try(self._records.update, zone, domain, _type, **params)
+        idomain = idna_encode(domain)
+        izone = idna_encode(zone)
+        return self._try(self._records.update, izone, idomain, _type, **params)
 
     def zones_create(self, name):
-        self._zones_cache[name] = self._try(self._zones.create, name)
+        iname = idna_encode(name)
+        self._zones_cache[name] = self._try(self._zones.create, iname)
         return self._zones_cache[name]
 
     def zones_retrieve(self, name):
         if name not in self._zones_cache:
-            self._zones_cache[name] = self._try(self._zones.retrieve, name)
+            iname = idna_encode(name)
+            self._zones_cache[name] = self._try(self._zones.retrieve, iname)
         return self._zones_cache[name]
 
     def _try(self, method, *args, **kwargs):
@@ -903,7 +914,7 @@ class Ns1Provider(BaseProvider):
             if _type not in self.SUPPORTS:
                 continue
             data_for = getattr(self, f'_data_for_{_type}')
-            name = zone.hostname_from_fqdn(record['domain'])
+            name = zone.hostname_from_fqdn(idna_decode(record['domain']))
             data = data_for(_type, record)
             record = Record.new(zone, name, data, source=self, lenient=lenient)
             zone_hash[(_type, name)] = record
