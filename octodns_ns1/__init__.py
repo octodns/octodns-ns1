@@ -31,11 +31,15 @@ class Ns1Exception(ProviderException):
 class Ns1Client(object):
     log = getLogger('NS1Client')
 
-    def __init__(self, api_key, parallelism=None, retry_count=4,
-                 client_config=None):
-        self.log.debug('__init__: parallelism=%s, retry_count=%d, '
-                       'client_config=%s', parallelism, retry_count,
-                       client_config)
+    def __init__(
+        self, api_key, parallelism=None, retry_count=4, client_config=None
+    ):
+        self.log.debug(
+            '__init__: parallelism=%s, retry_count=%d, ' 'client_config=%s',
+            parallelism,
+            retry_count,
+            client_config,
+        )
         self.retry_count = retry_count
 
         client = NS1(apiKey=api_key)
@@ -96,8 +100,9 @@ class Ns1Client(object):
                 # remove record's zone from cache
                 del self._zones_cache[zone]
 
-            cached = self._records_cache.setdefault(zone, {}) \
-                .setdefault(domain, {})
+            cached = self._records_cache.setdefault(zone, {}).setdefault(
+                domain, {}
+            )
 
             if _type in cached:
                 # remove record from cache
@@ -114,8 +119,9 @@ class Ns1Client(object):
 
     def read_or_set_record_cache(func):
         def call(self, zone, domain, _type):
-            cached = self._records_cache.setdefault(zone, {}) \
-                .setdefault(domain, {})
+            cached = self._records_cache.setdefault(zone, {}).setdefault(
+                domain, {}
+            )
             if _type not in cached:
                 cached[_type] = func(self, zone, domain, _type)
 
@@ -137,8 +143,9 @@ class Ns1Client(object):
             if source is None:
                 self.log.info('datasource_id: creating datasource %s', name)
                 # We need to create it
-                source = self.datasource_create(name=name,
-                                                sourcetype='nsone_monitoring')
+                source = self.datasource_create(
+                    name=name, sourcetype='nsone_monitoring'
+                )
                 self.log.info('datasource_id:   id=%s', source['id'])
 
             self._datasource_id = source['id']
@@ -160,16 +167,16 @@ class Ns1Client(object):
     def monitors(self):
         if self._monitors_cache is None:
             self.log.debug('monitors: fetching & building')
-            self._monitors_cache = \
-                {m['id']: m for m in self.monitors_list()}
+            self._monitors_cache = {m['id']: m for m in self.monitors_list()}
         return self._monitors_cache
 
     @property
     def notifylists(self):
         if self._notifylists_cache is None:
             self.log.debug('notifylists: fetching & building')
-            self._notifylists_cache = \
-                {l['name']: l for l in self.notifylists_list()}
+            self._notifylists_cache = {
+                l['name']: l for l in self.notifylists_list()
+            }
         return self._notifylists_cache
 
     def datafeed_create(self, sourceid, name, config):
@@ -263,9 +270,12 @@ class Ns1Client(object):
                 if tries <= 1:
                     raise
                 period = float(e.period)
-                self.log.warning('rate limit encountered, pausing '
-                                 'for %ds and trying again, %d remaining',
-                                 period, tries)
+                self.log.warning(
+                    'rate limit encountered, pausing '
+                    'for %ds and trying again, %d remaining',
+                    period,
+                    tries,
+                )
                 sleep(period)
                 tries -= 1
 
@@ -276,70 +286,62 @@ class Ns1Provider(BaseProvider):
     SUPPORTS_POOL_VALUE_STATUS = True
     SUPPORTS_MULTIVALUE_PTR = True
     SUPPORTS_ROOT_NS = True
-    SUPPORTS = set(('A', 'AAAA', 'ALIAS', 'CAA', 'CNAME', 'MX', 'NAPTR',
-                    'NS', 'PTR', 'SPF', 'SRV', 'TXT', 'URLFWD'))
+    SUPPORTS = set(
+        (
+            'A',
+            'AAAA',
+            'ALIAS',
+            'CAA',
+            'CNAME',
+            'MX',
+            'NAPTR',
+            'NS',
+            'PTR',
+            'SPF',
+            'SRV',
+            'TXT',
+            'URLFWD',
+        )
+    )
 
     ZONE_NOT_FOUND_MESSAGE = 'server error: zone not found'
     SHARED_NOTIFYLIST_NAME = 'octoDNS NS1 Notify List'
 
     @property
     def _UP_FILTER(self):
-        return {
-            'config': {},
-            'filter': 'up'
-        }
+        return {'config': {}, 'filter': 'up'}
 
     @property
     def _REGION_FILTER(self):
         return {
-            'config': {
-                'remove_no_georegion': True
-            },
-            'filter': u'geofence_regional'
+            'config': {'remove_no_georegion': True},
+            'filter': u'geofence_regional',
         }
 
     @property
     def _COUNTRY_FILTER(self):
         return {
-            'config': {
-                'remove_no_location': True
-            },
-            'filter': u'geofence_country'
+            'config': {'remove_no_location': True},
+            'filter': u'geofence_country',
         }
 
     # In the NS1 UI/portal, this filter is called "SELECT FIRST GROUP" though
     # the filter name in the NS1 api is 'select_first_region'
     @property
     def _SELECT_FIRST_REGION_FILTER(self):
-        return {
-            'config': {},
-            'filter': u'select_first_region'
-        }
+        return {'config': {}, 'filter': u'select_first_region'}
 
     @property
     def _PRIORITY_FILTER(self):
-        return {
-            'config': {
-                'eliminate': u'1'
-            },
-            'filter': 'priority'
-        }
+        return {'config': {'eliminate': u'1'}, 'filter': 'priority'}
 
     @property
     def _WEIGHTED_SHUFFLE_FILTER(self):
-        return {
-            'config': {},
-            'filter': u'weighted_shuffle'
-        }
+        return {'config': {}, 'filter': u'weighted_shuffle'}
 
     @property
     def _SELECT_FIRST_N_FILTER(self):
-        return {
-            'config': {
-                'N': u'1'
-            },
-            'filter': u'select_first_n'
-        }
+        return {'config': {'N': u'1'}, 'filter': u'select_first_n'}
 
     @property
     def _BASIC_FILTER_CHAIN(self):
@@ -348,7 +350,7 @@ class Ns1Provider(BaseProvider):
             self._SELECT_FIRST_REGION_FILTER,
             self._PRIORITY_FILTER,
             self._WEIGHTED_SHUFFLE_FILTER,
-            self._SELECT_FIRST_N_FILTER
+            self._SELECT_FIRST_N_FILTER,
         ]
 
     @property
@@ -359,7 +361,7 @@ class Ns1Provider(BaseProvider):
             self._SELECT_FIRST_REGION_FILTER,
             self._PRIORITY_FILTER,
             self._WEIGHTED_SHUFFLE_FILTER,
-            self._SELECT_FIRST_N_FILTER
+            self._SELECT_FIRST_N_FILTER,
         ]
 
     @property
@@ -370,7 +372,7 @@ class Ns1Provider(BaseProvider):
             self._SELECT_FIRST_REGION_FILTER,
             self._PRIORITY_FILTER,
             self._WEIGHTED_SHUFFLE_FILTER,
-            self._SELECT_FIRST_N_FILTER
+            self._SELECT_FIRST_N_FILTER,
         ]
 
     @property
@@ -382,7 +384,7 @@ class Ns1Provider(BaseProvider):
             self._SELECT_FIRST_REGION_FILTER,
             self._PRIORITY_FILTER,
             self._WEIGHTED_SHUFFLE_FILTER,
-            self._SELECT_FIRST_N_FILTER
+            self._SELECT_FIRST_N_FILTER,
         ]
 
     _REGION_TO_CONTINENT = {
@@ -406,30 +408,108 @@ class Ns1Provider(BaseProvider):
 
     # Necessary for handling unsupported continents in _CONTINENT_TO_REGIONS
     _CONTINENT_TO_LIST_OF_COUNTRIES = {
-        'OC': {'FJ', 'NC', 'PG', 'SB', 'VU', 'AU', 'NF', 'NZ', 'FM', 'GU',
-               'KI', 'MH', 'MP', 'NR', 'PW', 'AS', 'CK', 'NU', 'PF', 'PN',
-               'TK', 'TO', 'TV', 'WF', 'WS'},
-        'NA': {'DO', 'DM', 'BB', 'BL', 'BM', 'HT', 'KN', 'JM', 'VC', 'HN',
-               'BS', 'BZ', 'PR', 'NI', 'LC', 'TT', 'VG', 'PA', 'TC', 'PM',
-               'GT', 'AG', 'GP', 'AI', 'VI', 'CA', 'GD', 'AW', 'CR', 'GL',
-               'CU', 'MF', 'SV', 'US', 'MQ', 'MS', 'KY', 'MX', 'CW', 'BQ',
-               'SX', 'UM'}
+        'OC': {
+            'FJ',
+            'NC',
+            'PG',
+            'SB',
+            'VU',
+            'AU',
+            'NF',
+            'NZ',
+            'FM',
+            'GU',
+            'KI',
+            'MH',
+            'MP',
+            'NR',
+            'PW',
+            'AS',
+            'CK',
+            'NU',
+            'PF',
+            'PN',
+            'TK',
+            'TO',
+            'TV',
+            'WF',
+            'WS',
+        },
+        'NA': {
+            'DO',
+            'DM',
+            'BB',
+            'BL',
+            'BM',
+            'HT',
+            'KN',
+            'JM',
+            'VC',
+            'HN',
+            'BS',
+            'BZ',
+            'PR',
+            'NI',
+            'LC',
+            'TT',
+            'VG',
+            'PA',
+            'TC',
+            'PM',
+            'GT',
+            'AG',
+            'GP',
+            'AI',
+            'VI',
+            'CA',
+            'GD',
+            'AW',
+            'CR',
+            'GL',
+            'CU',
+            'MF',
+            'SV',
+            'US',
+            'MQ',
+            'MS',
+            'KY',
+            'MX',
+            'CW',
+            'BQ',
+            'SX',
+            'UM',
+        },
     }
 
-    def __init__(self, id, api_key, retry_count=4, monitor_regions=None,
-                 parallelism=None, client_config=None, shared_notifylist=False,
-                 *args, **kwargs):
+    def __init__(
+        self,
+        id,
+        api_key,
+        retry_count=4,
+        monitor_regions=None,
+        parallelism=None,
+        client_config=None,
+        shared_notifylist=False,
+        *args,
+        **kwargs,
+    ):
         self.log = getLogger(f'Ns1Provider[{id}]')
-        self.log.debug('__init__: id=%s, api_key=***, retry_count=%d, '
-                       'monitor_regions=%s, parallelism=%s, client_config=%s',
-                       id, retry_count, monitor_regions, parallelism,
-                       client_config)
+        self.log.debug(
+            '__init__: id=%s, api_key=***, retry_count=%d, '
+            'monitor_regions=%s, parallelism=%s, client_config=%s',
+            id,
+            retry_count,
+            monitor_regions,
+            parallelism,
+            client_config,
+        )
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
         self.monitor_regions = monitor_regions
         self.shared_notifylist = shared_notifylist
         self.record_filters = dict()
-        self._client = Ns1Client(api_key, parallelism, retry_count,
-                                 client_config)
+        self._client = Ns1Client(
+            api_key, parallelism, retry_count, client_config
+        )
 
     def _sanitize_disabled_in_filter_config(self, filter_cfg):
         # remove disabled=False from filters
@@ -442,8 +522,9 @@ class Ns1Provider(BaseProvider):
         self._sanitize_disabled_in_filter_config(filter_cfg)
         has_region = self._REGION_FILTER in filter_cfg
         has_country = self._COUNTRY_FILTER in filter_cfg
-        expected_filter_cfg = self._get_updated_filter_chain(has_region,
-                                                             has_country)
+        expected_filter_cfg = self._get_updated_filter_chain(
+            has_region, has_country
+        )
         return filter_cfg == expected_filter_cfg
 
     def _get_updated_filter_chain(self, has_region, has_country):
@@ -476,10 +557,7 @@ class Ns1Provider(BaseProvider):
         # record meta (which would include geo information is only
         # returned when getting a record's detail, not from zone detail
         geo = defaultdict(list)
-        data = {
-            'ttl': record['ttl'],
-            'type': _type,
-        }
+        data = {'ttl': record['ttl'], 'type': _type}
         values, codes = [], []
         for answer in record.get('answers', []):
             meta = answer.get('meta', {})
@@ -508,9 +586,7 @@ class Ns1Provider(BaseProvider):
                 values.extend(answer['answer'])
                 codes.append([])
         values = [str(x) for x in values]
-        geo = OrderedDict(
-            {str(k): [str(x) for x in v] for k, v in geo.items()}
-        )
+        geo = OrderedDict({str(k): [str(x) for x in v] for k, v in geo.items()})
         data['values'] = values
         data['geo'] = geo
         return data
@@ -561,10 +637,7 @@ class Ns1Provider(BaseProvider):
                 pool_name = notes_pool_name
 
             pool = pools[pool_name]
-            value_dict = {
-                'value': value,
-                'weight': int(meta.get('weight', 1)),
-            }
+            value_dict = {'value': value, 'weight': int(meta.get('weight', 1))}
             if isinstance(meta['up'], bool):
                 value_dict['status'] = 'up' if meta['up'] else 'down'
 
@@ -622,8 +695,10 @@ class Ns1Provider(BaseProvider):
                 geos.add(f'{con}-{country}')
 
         for continent, countries in special_continents.items():
-            if countries == self._CONTINENT_TO_LIST_OF_COUNTRIES[
-                    continent] or continent in continents_from_notes:
+            if (
+                countries == self._CONTINENT_TO_LIST_OF_COUNTRIES[continent]
+                or continent in continents_from_notes
+            ):
                 # All countries found or continent in notes, so add it to geos
                 geos.add(continent)
             else:
@@ -664,10 +739,7 @@ class Ns1Provider(BaseProvider):
             try:
                 rule = rules[rule_order]
             except KeyError:
-                rule = {
-                    'pool': pool_name,
-                    '_order': rule_order,
-                }
+                rule = {'pool': pool_name, '_order': rule_order}
                 rules[rule_order] = rule
 
             geos = self._parse_rule_geos(meta, notes)
@@ -690,10 +762,7 @@ class Ns1Provider(BaseProvider):
         rules = self._parse_rules(pools, record['regions'])
 
         data = {
-            'dynamic': {
-                'pools': pools,
-                'rules': rules,
-            },
+            'dynamic': {'pools': pools, 'rules': rules},
             'ttl': record['ttl'],
             'type': _type,
         }
@@ -722,18 +791,14 @@ class Ns1Provider(BaseProvider):
         return {
             'ttl': record['ttl'],
             'type': _type,
-            'values': [str(x) for x in record['short_answers']]
+            'values': [str(x) for x in record['short_answers']],
         }
 
     _data_for_AAAA = _data_for_A
 
     def _data_for_SPF(self, _type, record):
         values = [v.replace(';', '\\;') for v in record['short_answers']]
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': values
-        }
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     _data_for_TXT = _data_for_SPF
 
@@ -741,16 +806,8 @@ class Ns1Provider(BaseProvider):
         values = []
         for answer in record['short_answers']:
             flags, tag, value = answer.split(' ', 2)
-            values.append({
-                'flags': flags,
-                'tag': tag,
-                'value': value,
-            })
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': values,
-        }
+            values.append({'flags': flags, 'tag': tag, 'value': value})
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     def _data_for_CNAME(self, _type, record):
         if record.get('tier', 1) > 1:
@@ -763,9 +820,12 @@ class Ns1Provider(BaseProvider):
             if 'pool:' in first_answer_note:
                 return self._data_for_dynamic(_type, record)
             # If not, it can't be parsed. Let it be an empty record
-            self.log.warning('Cannot parse %s dynamic record due to missing '
-                             'pool name in first answer note, treating it as '
-                             'an empty record', record['domain'])
+            self.log.warning(
+                'Cannot parse %s dynamic record due to missing '
+                'pool name in first answer note, treating it as '
+                'an empty record',
+                record['domain'],
+            )
             value = None
         else:
             try:
@@ -773,11 +833,7 @@ class Ns1Provider(BaseProvider):
             except IndexError:
                 value = None
 
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'value': value,
-        }
+        return {'ttl': record['ttl'], 'type': _type, 'value': value}
 
     _data_for_ALIAS = _data_for_CNAME
 
@@ -785,34 +841,31 @@ class Ns1Provider(BaseProvider):
         values = []
         for answer in record['short_answers']:
             preference, exchange = answer.split(' ', 1)
-            values.append({
-                'preference': preference,
-                'exchange': exchange,
-            })
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': values,
-        }
+            values.append({'preference': preference, 'exchange': exchange})
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     def _data_for_NAPTR(self, _type, record):
         values = []
         for answer in record['short_answers']:
-            order, preference, flags, service, regexp, replacement = \
-                answer.split(' ', 5)
-            values.append({
-                'flags': flags,
-                'order': order,
-                'preference': preference,
-                'regexp': regexp,
-                'replacement': replacement,
-                'service': service,
-            })
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': values,
-        }
+            (
+                order,
+                preference,
+                flags,
+                service,
+                regexp,
+                replacement,
+            ) = answer.split(' ', 5)
+            values.append(
+                {
+                    'flags': flags,
+                    'order': order,
+                    'preference': preference,
+                    'regexp': regexp,
+                    'replacement': replacement,
+                    'service': service,
+                }
+            )
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     def _data_for_NS(self, _type, record):
         return {
@@ -827,39 +880,38 @@ class Ns1Provider(BaseProvider):
         values = []
         for answer in record['short_answers']:
             priority, weight, port, target = answer.split(' ', 3)
-            values.append({
-                'priority': priority,
-                'weight': weight,
-                'port': port,
-                'target': target,
-            })
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': values,
-        }
+            values.append(
+                {
+                    'priority': priority,
+                    'weight': weight,
+                    'port': port,
+                    'target': target,
+                }
+            )
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     def _data_for_URLFWD(self, _type, record):
         values = []
         for answer in record['short_answers']:
-            path, target, code, masking, query  = answer.split(' ', 4)
-            values.append({
-                'path': path,
-                'target': target,
-                'code': code,
-                'masking': masking,
-                'query': query,
-            })
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': values,
-        }
+            path, target, code, masking, query = answer.split(' ', 4)
+            values.append(
+                {
+                    'path': path,
+                    'target': target,
+                    'code': code,
+                    'masking': masking,
+                    'query': query,
+                }
+            )
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     def populate(self, zone, target=False, lenient=False):
-        self.log.debug('populate: name=%s, target=%s, lenient=%s',
-                       zone.name,
-                       target, lenient)
+        self.log.debug(
+            'populate: name=%s, target=%s, lenient=%s',
+            zone.name,
+            target,
+            lenient,
+        )
 
         try:
             ns1_zone_name = zone.name[:-1]
@@ -870,8 +922,14 @@ class Ns1Provider(BaseProvider):
 
             # change answers for certain types to always be absolute
             for record in ns1_zone['records']:
-                if record['type'] in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR',
-                                      'SRV']:
+                if record['type'] in [
+                    'ALIAS',
+                    'CNAME',
+                    'MX',
+                    'NS',
+                    'PTR',
+                    'SRV',
+                ]:
                     record['short_answers'] = [
                         _ensure_endswith_dot(a)
                         for a in record.get('short_answers', [])
@@ -879,9 +937,9 @@ class Ns1Provider(BaseProvider):
 
                 if record.get('tier', 1) > 1:
                     # Need to get the full record data for geo records
-                    record = self._client.records_retrieve(ns1_zone_name,
-                                                           record['domain'],
-                                                           record['type'])
+                    record = self._client.records_retrieve(
+                        ns1_zone_name, record['domain'], record['type']
+                    )
                     geo_records.append(record)
                 else:
                     records.append(record)
@@ -908,8 +966,11 @@ class Ns1Provider(BaseProvider):
             record = Record.new(zone, name, data, source=self, lenient=lenient)
             zone_hash[(_type, name)] = record
         [zone.add_record(r, lenient=lenient) for r in zone_hash.values()]
-        self.log.info('populate:   found %s records, exists=%s',
-                      len(zone.records) - before, exists)
+        self.log.info(
+            'populate:   found %s records, exists=%s',
+            len(zone.records) - before,
+            exists,
+        )
         return exists
 
     def _params_for_geo_A(self, record):
@@ -928,23 +989,17 @@ class Ns1Provider(BaseProvider):
                 has_country = True
             for answer in target.values:
                 params['answers'].append(
-                    {
-                        'answer': [answer],
-                        'meta': {key: [value]},
-                    },
+                    {'answer': [answer], 'meta': {key: [value]}}
                 )
 
         params['filters'] = []
         if has_country:
-            params['filters'].append(
-                {"filter": "shuffle", "config": {}}
-            )
+            params['filters'].append({"filter": "shuffle", "config": {}})
             params['filters'].append(
                 {"filter": "geotarget_country", "config": {}}
             )
             params['filters'].append(
-                {"filter": "select_first_n",
-                 "config": {"N": 1}}
+                {"filter": "select_first_n", "config": {"N": 1}}
             )
 
         return params, None
@@ -960,8 +1015,10 @@ class Ns1Provider(BaseProvider):
                 data = self._parse_notes(monitor['notes'])
                 if not data:
                     continue
-                if expected_host == data['host'] and \
-                   expected_type == data['type']:
+                if (
+                    expected_host == data['host']
+                    and expected_type == data['type']
+                ):
                     # This monitor does not belong to this record
                     config = monitor['config']
                     value = config['host']
@@ -982,11 +1039,10 @@ class Ns1Provider(BaseProvider):
         name = f'{monitor["name"]} - {self._uuid()[:6]}'
 
         # Create the data feed
-        config = {
-            'jobid': monitor_id,
-        }
-        feed = self._client.datafeed_create(self._client.datasource_id, name,
-                                            config)
+        config = {'jobid': monitor_id}
+        feed = self._client.datafeed_create(
+            self._client.datasource_id, name, config
+        )
         feed_id = feed['id']
         self.log.debug('_feed_create:   feed=%s', feed_id)
 
@@ -996,19 +1052,22 @@ class Ns1Provider(BaseProvider):
         self.log.debug('_notifylists_find_or_create: name="%s"', name)
         try:
             nl = self._client.notifylists[name]
-            self.log.debug('_notifylists_find_or_create:   existing=%s',
-                           nl['id'])
+            self.log.debug(
+                '_notifylists_find_or_create:   existing=%s', nl['id']
+            )
         except KeyError:
-            notify_list = [{
-                'config': {
-                    'sourceid': self._client.datasource_id,
-                },
-                'type': 'datafeed',
-            }]
-            nl = self._client.notifylists_create(name=name,
-                                                 notify_list=notify_list)
-            self.log.debug('_notifylists_find_or_create:   created=%s',
-                           nl['id'])
+            notify_list = [
+                {
+                    'config': {'sourceid': self._client.datasource_id},
+                    'type': 'datafeed',
+                }
+            ]
+            nl = self._client.notifylists_create(
+                name=name, notify_list=notify_list
+            )
+            self.log.debug(
+                '_notifylists_find_or_create:   created=%s', nl['id']
+            )
 
         return nl
 
@@ -1016,8 +1075,11 @@ class Ns1Provider(BaseProvider):
         self.log.debug('_monitor_create: monitor="%s"', monitor['name'])
 
         # Find the right notifylist
-        nl_name = self.SHARED_NOTIFYLIST_NAME \
-            if self.shared_notifylist else monitor['name']
+        nl_name = (
+            self.SHARED_NOTIFYLIST_NAME
+            if self.shared_notifylist
+            else monitor['name']
+        )
         nl = self._notifylists_find_or_create(nl_name)
 
         # Create the monitor
@@ -1029,29 +1091,39 @@ class Ns1Provider(BaseProvider):
         return monitor_id, self._feed_create(monitor)
 
     def _healthcheck_policy(self, record):
-        return record._octodns.get('ns1', {}) \
-            .get('healthcheck', {}) \
+        return (
+            record._octodns.get('ns1', {})
+            .get('healthcheck', {})
             .get('policy', 'quorum')
+        )
 
     def _healthcheck_frequency(self, record):
-        return record._octodns.get('ns1', {}) \
-            .get('healthcheck', {}) \
+        return (
+            record._octodns.get('ns1', {})
+            .get('healthcheck', {})
             .get('frequency', 60)
+        )
 
     def _healthcheck_rapid_recheck(self, record):
-        return record._octodns.get('ns1', {}) \
-            .get('healthcheck', {}) \
+        return (
+            record._octodns.get('ns1', {})
+            .get('healthcheck', {})
             .get('rapid_recheck', False)
+        )
 
     def _healthcheck_connect_timeout(self, record):
-        return record._octodns.get('ns1', {}) \
-            .get('healthcheck', {}) \
+        return (
+            record._octodns.get('ns1', {})
+            .get('healthcheck', {})
             .get('connect_timeout', 2)
+        )
 
     def _healthcheck_response_timeout(self, record):
-        return record._octodns.get('ns1', {}) \
-            .get('healthcheck', {}) \
+        return (
+            record._octodns.get('ns1', {})
+            .get('healthcheck', {})
             .get('response_timeout', 10)
+        )
 
     def _monitor_gen(self, record, value):
         host = record.fqdn[:-1]
@@ -1065,23 +1137,20 @@ class Ns1Provider(BaseProvider):
             'active': True,
             'config': {
                 'connect_timeout':
-                    # TCP monitors use milliseconds, so convert from
-                    # seconds to milliseconds
-                    self._healthcheck_connect_timeout(record) * 1000,
+                # TCP monitors use milliseconds, so convert from
+                # seconds to milliseconds
+                self._healthcheck_connect_timeout(record) * 1000,
                 'host': value,
                 'port': record.healthcheck_port,
                 'response_timeout':
-                    # TCP monitors use milliseconds, so convert from
-                    # seconds to milliseconds
-                    self._healthcheck_response_timeout(record) * 1000,
+                # TCP monitors use milliseconds, so convert from
+                # seconds to milliseconds
+                self._healthcheck_response_timeout(record) * 1000,
                 'ssl': record.healthcheck_protocol == 'HTTPS',
             },
             'job_type': 'tcp',
             'name': f'{host} - {_type} - {value}',
-            'notes': self._encode_notes({
-                'host': host,
-                'type': _type,
-            }),
+            'notes': self._encode_notes({'host': host, 'type': _type}),
             'policy': self._healthcheck_policy(record),
             'frequency': self._healthcheck_frequency(record),
             'rapid_recheck': self._healthcheck_rapid_recheck(record),
@@ -1096,15 +1165,15 @@ class Ns1Provider(BaseProvider):
             # IF it's HTTP we need to send the request string
             path = record.healthcheck_path
             host = record.healthcheck_host(value=value)
-            request = fr'GET {path} HTTP/1.0\r\nHost: {host}\r\n' \
+            request = (
+                fr'GET {path} HTTP/1.0\r\nHost: {host}\r\n'
                 r'User-agent: NS1\r\n\r\n'
+            )
             ret['config']['send'] = request
             # We'll also expect a HTTP response
-            ret['rules'] = [{
-                'comparison': 'contains',
-                'key': 'output',
-                'value': '200 OK',
-            }]
+            ret['rules'] = [
+                {'comparison': 'contains', 'key': 'output', 'value': '200 OK'}
+            ]
 
         return ret
 
@@ -1118,8 +1187,7 @@ class Ns1Provider(BaseProvider):
         return True
 
     def _monitor_sync(self, record, value, existing):
-        self.log.debug('_monitor_sync: record=%s, value=%s', record.fqdn,
-                       value)
+        self.log.debug('_monitor_sync: record=%s, value=%s', record.fqdn, value)
         expected = self._monitor_gen(record, value)
 
         if existing:
@@ -1134,8 +1202,11 @@ class Ns1Provider(BaseProvider):
 
             feed_id = self._client.feeds_for_monitors.get(monitor_id)
             if feed_id is None:
-                self.log.warning('_monitor_sync: %s (%s) missing feed, '
-                                 'creating', existing['name'], monitor_id)
+                self.log.warning(
+                    '_monitor_sync: %s (%s) missing feed, ' 'creating',
+                    existing['name'],
+                    monitor_id,
+                )
                 feed_id = self._feed_create(existing)
         else:
             self.log.debug('_monitor_sync:   needs create')
@@ -1145,8 +1216,11 @@ class Ns1Provider(BaseProvider):
         return monitor_id, feed_id
 
     def _monitors_gc(self, record, active_monitor_ids=None):
-        self.log.debug('_monitors_gc: record=%s, active_monitor_ids=%s',
-                       record.fqdn, active_monitor_ids)
+        self.log.debug(
+            '_monitors_gc: record=%s, active_monitor_ids=%s',
+            record.fqdn,
+            active_monitor_ids,
+        )
 
         if active_monitor_ids is None:
             active_monitor_ids = set()
@@ -1160,8 +1234,9 @@ class Ns1Provider(BaseProvider):
 
             feed_id = self._client.feeds_for_monitors.get(monitor_id)
             if feed_id:
-                self._client.datafeed_delete(self._client.datasource_id,
-                                             feed_id)
+                self._client.datafeed_delete(
+                    self._client.datasource_id, feed_id
+                )
 
             self._client.monitors_delete(monitor_id)
 
@@ -1174,8 +1249,16 @@ class Ns1Provider(BaseProvider):
                         self._client.notifylists_delete(notify_list_id)
                     break
 
-    def _add_answers_for_pool(self, answers, default_answers, pool_name,
-                              pool_label, pool_answers, pools, priority):
+    def _add_answers_for_pool(
+        self,
+        answers,
+        default_answers,
+        pool_name,
+        pool_label,
+        pool_answers,
+        pools,
+        priority,
+    ):
         current_pool_name = pool_name
         seen = set()
         while current_pool_name and current_pool_name not in seen:
@@ -1191,11 +1274,13 @@ class Ns1Provider(BaseProvider):
                     'answer': answer['answer'],
                     'meta': {
                         'priority': priority,
-                        'note': self._encode_notes({
-                            'from': pool_label,
-                            'pool': current_pool_name,
-                            'fallback': fallback or '',
-                        }),
+                        'note': self._encode_notes(
+                            {
+                                'from': pool_label,
+                                'pool': current_pool_name,
+                                'fallback': fallback or '',
+                            }
+                        ),
                         'up': up,
                         'weight': answer['weight'],
                     },
@@ -1212,9 +1297,7 @@ class Ns1Provider(BaseProvider):
                 'answer': answer['answer'],
                 'meta': {
                     'priority': priority,
-                    'note': self._encode_notes({
-                        'from': '--default--',
-                    }),
+                    'note': self._encode_notes({'from': '--default--'}),
                     'up': True,
                     'weight': 1,
                 },
@@ -1238,9 +1321,7 @@ class Ns1Provider(BaseProvider):
         for i, rule in enumerate(record.dynamic.rules):
             pool_name = rule.data['pool']
 
-            notes = {
-                'rule-order': i,
-            }
+            notes = {'rule-order': i}
 
             fallback = pools[pool_name].data.get('fallback', None)
             if fallback:
@@ -1256,8 +1337,9 @@ class Ns1Provider(BaseProvider):
                 if n == 8:
                     # US state, e.g. NA-US-KY
                     # CA province, e.g. NA-CA-NL
-                    us_state.add(geo[-2:]) if "NA-US" in geo \
-                        else ca_province.add(geo[-2:])
+                    us_state.add(
+                        geo[-2:]
+                    ) if "NA-US" in geo else ca_province.add(geo[-2:])
                     # For filtering. State filtering is done by the country
                     # filter
                     has_country = True
@@ -1273,10 +1355,12 @@ class Ns1Provider(BaseProvider):
                     else:
                         # No maps for geo in _CONTINENT_TO_REGIONS.
                         # Use the country list
-                        self.log.debug('Converting geo {} to country list'.
-                                       format(geo))
-                        continent_countries = \
+                        self.log.debug(
+                            'Converting geo {} to country list'.format(geo)
+                        )
+                        continent_countries = (
                             self._CONTINENT_TO_LIST_OF_COUNTRIES[geo]
+                        )
                         exclude = explicit_countries.get(geo, set())
                         country.update(continent_countries - exclude)
                         notes.setdefault('continents', set()).add(geo)
@@ -1285,16 +1369,12 @@ class Ns1Provider(BaseProvider):
             if 'continents' in notes:
                 notes['continents'] = ','.join(sorted(notes['continents']))
 
-            meta = {
-                'note': self._encode_notes(notes),
-            }
+            meta = {'note': self._encode_notes(notes)}
 
             if georegion:
                 georegion_meta = dict(meta)
                 georegion_meta['georegion'] = sorted(georegion)
-                regions[f'{pool_name}__georegion'] = {
-                    'meta': georegion_meta,
-                }
+                regions[f'{pool_name}__georegion'] = {'meta': georegion_meta}
 
             if country or us_state or ca_province:
                 # If there's country and/or states its a country pool,
@@ -1309,14 +1389,10 @@ class Ns1Provider(BaseProvider):
                     country_state_meta['us_state'] = sorted(us_state)
                 if ca_province:
                     country_state_meta['ca_province'] = sorted(ca_province)
-                regions[f'{pool_name}__country'] = {
-                    'meta': country_state_meta,
-                }
+                regions[f'{pool_name}__country'] = {'meta': country_state_meta}
             elif not georegion:
                 # If there's no targeting it's a catchall
-                regions[f'{pool_name}__catchall'] = {
-                    'meta': meta,
-                }
+                regions[f'{pool_name}__catchall'] = {'meta': meta}
 
         return has_country, has_region, regions
 
@@ -1343,26 +1419,26 @@ class Ns1Provider(BaseProvider):
                     # found
                     if not feed_id:
                         existing = existing_monitors.get(value)
-                        monitor_id, feed_id = self._monitor_sync(record, value,
-                                                                 existing)
+                        monitor_id, feed_id = self._monitor_sync(
+                            record, value, existing
+                        )
                         value_feed[value] = feed_id
                         active_monitors.add(monitor_id)
 
-                pool_answers[pool_name].append({
-                    'answer': [value],
-                    'weight': weight,
-                    'feed_id': feed_id,
-                    'status': status,
-                })
+                pool_answers[pool_name].append(
+                    {
+                        'answer': [value],
+                        'weight': weight,
+                        'feed_id': feed_id,
+                        'status': status,
+                    }
+                )
 
         if record._type == 'CNAME':
             default_values = [record.value]
         else:
             default_values = record.values
-        default_answers = [{
-            'answer': [v],
-            'weight': 1,
-        } for v in default_values]
+        default_answers = [{'answer': [v], 'weight': 1} for v in default_values]
 
         # Build our list of answers
         # The regions dictionary built above already has the required pool
@@ -1375,9 +1451,15 @@ class Ns1Provider(BaseProvider):
             pool_label = pool_name
             # Remove the pool type from the end of the name
             pool_name = self._parse_dynamic_pool_name(pool_name)
-            self._add_answers_for_pool(answers, default_answers, pool_name,
-                                       pool_label, pool_answers, pools,
-                                       priority)
+            self._add_answers_for_pool(
+                answers,
+                default_answers,
+                pool_name,
+                pool_label,
+                pool_answers,
+                pools,
+                priority,
+            )
 
         return active_monitors, answers
 
@@ -1404,10 +1486,7 @@ class Ns1Provider(BaseProvider):
         elif hasattr(record, 'geo'):
             return self._params_for_geo_A(record)
 
-        return {
-            'answers': record.values,
-            'ttl': record.ttl,
-        }, None
+        return {'answers': record.values, 'ttl': record.ttl}, None
 
     _params_for_AAAA = _params_for_A
     _params_for_NS = _params_for_A
@@ -1438,24 +1517,26 @@ class Ns1Provider(BaseProvider):
         return {'answers': values, 'ttl': record.ttl}, None
 
     def _params_for_NAPTR(self, record):
-        values = [(v.order, v.preference, v.flags, v.service, v.regexp,
-                   v.replacement) for v in record.values]
+        values = [
+            (v.order, v.preference, v.flags, v.service, v.regexp, v.replacement)
+            for v in record.values
+        ]
         return {'answers': values, 'ttl': record.ttl}, None
 
     def _params_for_PTR(self, record):
-        return {
-            'answers': record.values,
-            'ttl': record.ttl,
-        }, None
+        return {'answers': record.values, 'ttl': record.ttl}, None
 
     def _params_for_SRV(self, record):
-        values = [(v.priority, v.weight, v.port, v.target)
-                  for v in record.values]
+        values = [
+            (v.priority, v.weight, v.port, v.target) for v in record.values
+        ]
         return {'answers': values, 'ttl': record.ttl}, None
 
     def _params_for_URLFWD(self, record):
-        values = [(v.path, v.target, v.code, v.masking, v.query)
-                  for v in record.values]
+        values = [
+            (v.path, v.target, v.code, v.masking, v.query)
+            for v in record.values
+        ]
         return {'answers': values, 'ttl': record.ttl}, None
 
     def _extra_changes(self, desired, changes, **kwargs):
@@ -1477,8 +1558,11 @@ class Ns1Provider(BaseProvider):
             if not self._valid_filter_config(record_filters):
                 # unrecognized set of filters, overwrite them by updating the
                 # record
-                self.log.info('_extra_changes: unrecognized filters in %s, '
-                              'will update record', domain)
+                self.log.info(
+                    '_extra_changes: unrecognized filters in %s, '
+                    'will update record',
+                    domain,
+                )
                 extra.append(Update(record, record))
                 continue
 
@@ -1486,13 +1570,19 @@ class Ns1Provider(BaseProvider):
                 expected = self._monitor_gen(record, value)
                 # TODO: find values which have missing monitors
                 if not self._monitor_is_match(expected, have):
-                    self.log.info('_extra_changes: monitor mis-match for %s',
-                                  expected['name'])
+                    self.log.info(
+                        '_extra_changes: monitor mis-match for %s',
+                        expected['name'],
+                    )
                     extra.append(Update(record, record))
                     break
                 if not have.get('notify_list'):
-                    self.log.info('_extra_changes: broken monitor no notify '
-                                  'list %s (%s)', have['name'], have['id'])
+                    self.log.info(
+                        '_extra_changes: broken monitor no notify '
+                        'list %s (%s)',
+                        have['name'],
+                        have['id'],
+                    )
                     extra.append(Update(record, record))
                     break
 
@@ -1536,8 +1626,9 @@ class Ns1Provider(BaseProvider):
     def _apply(self, plan):
         desired = plan.desired
         changes = plan.changes
-        self.log.debug('_apply: zone=%s, len(changes)=%d', desired.name,
-                       len(changes))
+        self.log.debug(
+            '_apply: zone=%s, len(changes)=%d', desired.name, len(changes)
+        )
 
         # Make sure that if we're going to make any dynamic changes that we
         # have monitor_regions configured before touching anything so we can
