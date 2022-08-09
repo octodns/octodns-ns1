@@ -12,6 +12,7 @@ from pycountry_convert import country_alpha2_to_continent_code
 from time import sleep
 from uuid import uuid4
 
+from octodns.idna import idna_decode, idna_encode
 from octodns.record import Record, Update
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
@@ -914,7 +915,7 @@ class Ns1Provider(BaseProvider):
         )
 
         try:
-            ns1_zone_name = zone.name[:-1]
+            ns1_zone_name = idna_encode(zone.name[:-1])
             ns1_zone = self._client.zones_retrieve(ns1_zone_name)
 
             records = []
@@ -938,7 +939,9 @@ class Ns1Provider(BaseProvider):
                 if record.get('tier', 1) > 1:
                     # Need to get the full record data for geo records
                     record = self._client.records_retrieve(
-                        ns1_zone_name, record['domain'], record['type']
+                        ns1_zone_name,
+                        idna_encode(record['domain']),
+                        record['type'],
                     )
                     geo_records.append(record)
                 else:
@@ -961,7 +964,7 @@ class Ns1Provider(BaseProvider):
             if _type not in self.SUPPORTS:
                 continue
             data_for = getattr(self, f'_data_for_{_type}')
-            name = zone.hostname_from_fqdn(record['domain'])
+            name = zone.hostname_from_fqdn(idna_decode(record['domain']))
             data = data_for(_type, record)
             record = Record.new(zone, name, data, source=self, lenient=lenient)
             zone_hash[(_type, name)] = record
@@ -1594,7 +1597,9 @@ class Ns1Provider(BaseProvider):
         domain = new.fqdn[:-1]
         _type = new._type
         params, active_monitor_ids = getattr(self, f'_params_for_{_type}')(new)
-        self._client.records_create(zone, domain, _type, **params)
+        self._client.records_create(
+            idna_encode(zone), idna_encode(domain), _type, **params
+        )
         self._monitors_gc(new, active_monitor_ids)
 
     def _apply_Update(self, ns1_zone, change):
@@ -1603,7 +1608,9 @@ class Ns1Provider(BaseProvider):
         domain = new.fqdn[:-1]
         _type = new._type
         params, active_monitor_ids = getattr(self, f'_params_for_{_type}')(new)
-        self._client.records_update(zone, domain, _type, **params)
+        self._client.records_update(
+            idna_encode(zone), idna_encode(domain), _type, **params
+        )
         # If we're cleaning up we need to send in the old record since it'd
         # have anything that needs cleaning up
         self._monitors_gc(change.existing, active_monitor_ids)
@@ -1613,7 +1620,9 @@ class Ns1Provider(BaseProvider):
         zone = existing.zone.name[:-1]
         domain = existing.fqdn[:-1]
         _type = existing._type
-        self._client.records_delete(zone, domain, _type)
+        self._client.records_delete(
+            idna_encode(zone), idna_encode(domain), _type
+        )
         self._monitors_gc(existing)
 
     def _has_dynamic(self, changes):
@@ -1638,12 +1647,12 @@ class Ns1Provider(BaseProvider):
 
         domain_name = desired.name[:-1]
         try:
-            ns1_zone = self._client.zones_retrieve(domain_name)
+            ns1_zone = self._client.zones_retrieve(idna_encode(domain_name))
         except ResourceException as e:
             if e.message != self.ZONE_NOT_FOUND_MESSAGE:
                 raise
             self.log.debug('_apply:   no matching zone, creating')
-            ns1_zone = self._client.zones_create(domain_name)
+            ns1_zone = self._client.zones_create(idna_encode(domain_name))
 
         for change in changes:
             class_name = change.__class__.__name__

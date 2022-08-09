@@ -2835,3 +2835,121 @@ class TestNs1Client(TestCase):
             client._records_cache,
         )
         self.assertEqual({}, client._zones_cache)
+
+    @patch('ns1.rest.records.Records.delete')
+    @patch('ns1.rest.records.Records.update')
+    @patch('ns1.rest.records.Records.create')
+    @patch('ns1.rest.records.Records.retrieve')
+    @patch('ns1.rest.zones.Zones.create')
+    @patch('ns1.rest.zones.Zones.retrieve')
+    def test_idna(
+        self,
+        zone_retrieve_mock,
+        zone_create_mock,
+        record_retrieve_mock,
+        record_create_mock,
+        record_update_mock,
+        record_delete_mock,
+    ):
+        provider = Ns1Provider('test', 'api-key')
+
+        def reset():
+            provider._client.reset_caches()
+            zone_retrieve_mock.reset_mock()
+            zone_retrieve_mock.side_effect = None
+            zone_create_mock.reset_mock()
+            zone_create_mock.side_effect = None
+            record_retrieve_mock.reset_mock()
+            record_retrieve_mock.side_effect = None
+            record_create_mock.reset_mock()
+            record_create_mock.side_effect = None
+            record_update_mock.reset_mock()
+            record_update_mock.side_effect = None
+            record_delete_mock.reset_mock()
+            record_delete_mock.side_effect = None
+
+        utf8 = 'zajęzyk'
+        encoded = 'xn--zajzyk-y4a'
+
+        zone = Zone(f'{utf8}.tests.', [])
+
+        # zone with a single geo record
+        geo_record = {
+            'domain': f'{encoded}.{encoded}.tests',
+            'zone': f'{encoded}.tests',
+            'type': 'A',
+            "answers": [
+                {'answer': ['1.1.1.1'], 'meta': {}},
+                {'answer': ['1.2.3.4'], 'meta': {'ca_province': ['ON']}},
+                {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
+                {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
+                {
+                    'answer': ['4.5.6.7'],
+                    'meta': {'iso_region_code': ['NA-US-WA']},
+                },
+            ],
+            'tier': 3,
+            'ttl': 42,
+        }
+        reset()
+        ns1_zone = {'records': [geo_record]}
+        zone_retrieve_mock.side_effect = [ns1_zone]
+        # Its tier 3 so we'll do a full lookup
+        record_retrieve_mock.side_effect = [geo_record]
+        provider.populate(zone)
+        records = list(zone.records)
+        self.assertEqual(1, len(records))
+        # the name of the record was decoded
+        self.assertEqual(f'{utf8}', records[0].name)
+        # record retrieve was called with the encoded names
+        record_retrieve_mock.assert_has_calls(
+            [call(f'{encoded}.tests', f'{encoded}.{encoded}.tests', 'A')]
+        )
+
+        # zone doesn't exist, we'll create it
+        reset()
+        zone_retrieve_mock.side_effect = ResourceException(
+            'server error: zone not found'
+        )
+        plan = provider.plan(zone)
+        self.assertTrue(plan)
+        provider.apply(plan)
+        # called with the encoded version of the name, once during populate,
+        # again during _apply
+        zone_retrieve_mock.assert_has_calls(
+            [call(f'{encoded}.tests'), call(f'{encoded}.tests')]
+        )
+        zone_create_mock.assert_has_calls([call(f'{encoded}.tests')])
+
+        # We have a record in zone, if we return nothing existing we should get
+        # a create
+        reset()
+        plan = provider.plan(zone)
+        provider.apply(plan)
+        self.assertEqual(
+            (f'{encoded}.tests', f'{encoded}.{encoded}.tests'),
+            record_create_mock.call_args[0][:2],
+        )
+
+        # Make an update to an existing record
+        reset()
+        geo_record['ttl'] = 43
+        zone_retrieve_mock.side_effect = [ns1_zone]
+        record_retrieve_mock.side_effect = [geo_record]
+        plan = provider.plan(zone)
+        provider.apply(plan)
+        self.assertEqual(
+            (f'{encoded}.tests', f'{encoded}.{encoded}.tests'),
+            record_update_mock.call_args[0][:2],
+        )
+
+        # Delete an existing record
+        reset()
+        zone_retrieve_mock.side_effect = [ns1_zone]
+        record_retrieve_mock.side_effect = [geo_record]
+        plan = provider.plan(Zone(f'{utf8}.tests.', []))
+        provider.apply(plan)
+        self.assertEqual(
+            (f'{encoded}.tests', f'{encoded}.{encoded}.tests', 'A'),
+            record_delete_mock.call_args[0],
+        )
