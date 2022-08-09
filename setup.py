@@ -52,7 +52,7 @@ setup(
         ),
     },
     install_requires=(
-        'octodns>=0.9.16',
+        'octodns>=0.9.18',
         'ns1_python>=0.17.1',
         'pycountry-convert>=0.7.2',
         'requests>=2.27.1',
