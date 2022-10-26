@@ -503,7 +503,7 @@ class Ns1Provider(BaseProvider):
             parallelism,
             client_config,
         )
-        super(Ns1Provider, self).__init__(id, *args, **kwargs)
+        super().__init__(id, *args, **kwargs)
         self.monitor_regions = monitor_regions
         self.shared_notifylist = shared_notifylist
         self.record_filters = dict()
