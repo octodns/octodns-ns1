@@ -35,7 +35,7 @@ class Ns1Client(object):
         self, api_key, parallelism=None, retry_count=4, client_config=None
     ):
         self.log.debug(
-            '__init__: parallelism=%s, retry_count=%d, ' 'client_config=%s',
+            '__init__: parallelism=%s, retry_count=%d, client_config=%s',
             parallelism,
             retry_count,
             client_config,
@@ -1203,7 +1203,7 @@ class Ns1Provider(BaseProvider):
             feed_id = self._client.feeds_for_monitors.get(monitor_id)
             if feed_id is None:
                 self.log.warning(
-                    '_monitor_sync: %s (%s) missing feed, ' 'creating',
+                    '_monitor_sync: %s (%s) missing feed, creating',
                     existing['name'],
                     monitor_id,
                 )
