@@ -8,8 +8,8 @@ from ns1.rest.errors import AuthException, RateLimitException, ResourceException
 from unittest import TestCase
 from unittest.mock import call, patch
 
-from octodns.record import Delete, Record, Update
 from octodns.provider.plan import Plan
+from octodns.record import Delete, Record, Update
 from octodns.zone import Zone
 
 from octodns_ns1 import Ns1Client, Ns1Exception, Ns1Provider
@@ -1062,6 +1062,15 @@ class TestNs1ProviderDynamic(TestCase):
         record._octodns['ns1']['healthcheck']['response_timeout'] = 2
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2000, monitor['config']['response_timeout'])
+
+        # Test http version validation
+        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
+        with self.assertRaisesRegex(
+            Ns1Exception,
+            r"unsupported http version found: 'invalid'. Expected version in \('HTTP/1.0', 'HTTP/1.1'\)",
+        ):
+            provider._healthcheck_http_version(record)
+        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
 
     def test_monitor_gen_AAAA(self):
         provider = Ns1Provider('test', 'api-key')
