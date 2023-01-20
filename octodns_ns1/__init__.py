@@ -2,19 +2,19 @@
 #
 #
 
-from logging import getLogger
-from itertools import chain
-from collections.abc import Mapping
 from collections import OrderedDict, defaultdict
+from collections.abc import Mapping
+from itertools import chain
+from logging import getLogger
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
 from pycountry_convert import country_alpha2_to_continent_code
 from time import sleep
 from uuid import uuid4
 
-from octodns.record import Record, Update
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
+from octodns.record import Record, Update
 
 
 __VERSION__ = '0.0.2'
@@ -490,6 +490,7 @@ class Ns1Provider(BaseProvider):
         parallelism=None,
         client_config=None,
         shared_notifylist=False,
+        default_healthcheck_http_version="HTTP/1.0",
         *args,
         **kwargs,
     ):
@@ -510,6 +511,7 @@ class Ns1Provider(BaseProvider):
         self._client = Ns1Client(
             api_key, parallelism, retry_count, client_config
         )
+        self.default_healthcheck_http_version = default_healthcheck_http_version
 
     def _sanitize_disabled_in_filter_config(self, filter_cfg):
         # remove disabled=False from filters
@@ -1125,6 +1127,19 @@ class Ns1Provider(BaseProvider):
             .get('response_timeout', 10)
         )
 
+    def _healthcheck_http_version(self, record):
+        http_version = (
+            record._octodns.get("ns1", {})
+            .get("healthcheck", {})
+            .get("http_version", self.default_healthcheck_http_version)
+        )
+        acceptable_http_versions = ("HTTP/1.0", "HTTP/1.1")
+        if http_version not in acceptable_http_versions:
+            raise Ns1Exception(
+                f"unsupported http version found: {http_version!r}. Expected version in {acceptable_http_versions}"
+            )
+        return http_version
+
     def _monitor_gen(self, record, value):
         host = record.fqdn[:-1]
         _type = record._type
@@ -1165,8 +1180,9 @@ class Ns1Provider(BaseProvider):
             # IF it's HTTP we need to send the request string
             path = record.healthcheck_path
             host = record.healthcheck_host(value=value)
+            http_version = self._healthcheck_http_version(record)
             request = (
-                fr'GET {path} HTTP/1.0\r\nHost: {host}\r\n'
+                fr'GET {path} {http_version}\r\nHost: {host}\r\n'
                 r'User-agent: NS1\r\n\r\n'
             )
             ret['config']['send'] = request
