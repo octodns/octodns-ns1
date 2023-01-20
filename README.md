@@ -61,6 +61,11 @@ providers:
         endpoint: my.nsone.endpoint # Default: api.nsone.net
         ignore-ssl-errors: true     # Default: false
         follow_pagination: false    # Default: true
+    # Optional. Default: HTTP/1.0 . Default HTTP protocol to use when 
+    # health-checking dynamic record endpoints. See "Health Check Options" 
+    # README section below to override per dynamic record.
+    default_healthcheck_http_version: HTTP/1.0
+
 ```
 
 ### Support Information
