@@ -2,7 +2,7 @@
 
 * Enable SUPPORTS_ROOT_NS for management of root NS records. Requires
   octodns>=0.9.16.
-* Use HTTP 1.1 in for NS1 dynamic DNS HTTPS monitors
+* Configurable http version for dynamic HTTPS monitors, to enable HTTP/1.1 support
 
 ## v0.0.2 - 2022-02-02 - pycountry-convert install_requires
 
