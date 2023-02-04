@@ -6,16 +6,16 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from itertools import chain
 from logging import getLogger
+from time import sleep
+from uuid import uuid4
+
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
 from pycountry_convert import country_alpha2_to_continent_code
-from time import sleep
-from uuid import uuid4
 
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
 from octodns.record import Record, Update
-
 
 __VERSION__ = '0.0.3'
 

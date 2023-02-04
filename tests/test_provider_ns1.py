@@ -4,9 +4,10 @@
 
 from collections import defaultdict
 from logging import getLogger
-from ns1.rest.errors import AuthException, RateLimitException, ResourceException
 from unittest import TestCase
 from unittest.mock import call, patch
+
+from ns1.rest.errors import AuthException, RateLimitException, ResourceException
 
 from octodns.provider.plan import Plan
 from octodns.record import Delete, Record, Update

@@ -9,6 +9,7 @@ cmarkgfm==0.8.0
 commonmark==0.9.1
 docutils==0.19
 importlib-metadata==5.0.0
+isort==5.11.4
 jaraco.classes==3.2.3
 keyring==23.9.3
 more-itertools==9.0.0
