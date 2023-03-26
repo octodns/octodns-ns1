@@ -379,8 +379,8 @@ class Ns1Provider(BaseProvider):
     def _FILTER_CHAIN_WITH_REGION_AND_COUNTRY(self):
         return [
             self._UP_FILTER,
-            self._REGION_FILTER,
             self._COUNTRY_FILTER,
+            self._REGION_FILTER,
             self._SELECT_FIRST_REGION_FILTER,
             self._PRIORITY_FILTER,
             self._WEIGHTED_SHUFFLE_FILTER,
