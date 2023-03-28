@@ -1,3 +1,10 @@
+## v0.0.4 - 2023-??-?? - ???
+
+* AS implemented as a list of countries rather than the ASIAPAC region which
+  didn't match as the AS list of countries in the first place
+* Add TL to the list of special case countries so that it can be individually
+  targeted
+
 ## v0.0.3 - 2023-01-24 - Support the root
 
 * Enable SUPPORTS_ROOT_NS for management of root NS records. Requires
