@@ -684,9 +684,9 @@ class Ns1Provider(BaseProvider):
             # country_alpha2_to_continent_code fails for Pitcairn ('PN'),
             # United States Minor Outlying Islands ('UM') and
             # Sint Maarten ('SX')
-            if country == 'PN':
+            if country in ('PN', 'UM'):
                 con = 'OC'
-            elif country in ['SX', 'UM']:
+            elif country == 'SX':
                 con = 'NA'
             else:
                 con = country_alpha2_to_continent_code(country)
