@@ -1,3 +1,9 @@
+## v0.0.4 - 2023-??-?? - ???
+
+* Dynamic records filter chain ordering reworked to place country filters before
+  regions, see https://github.com/octodns/octodns-ns1/pull/37 for
+  details/discussion.
+
 ## v0.0.3 - 2023-01-24 - Support the root
 
 * Enable SUPPORTS_ROOT_NS for management of root NS records. Requires
