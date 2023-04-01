@@ -1,7 +1,12 @@
 ## v0.0.4 - 2023-??-?? - ???
 
+* Dynamic records filter chain ordering reworked to place country filters before
+  regions, see https://github.com/octodns/octodns-ns1/pull/37 for
+  details/discussion.
 * AS implemented as a list of countries rather than the ASIAPAC region which
   didn't match as the AS list of countries in the first place
+* AS, NA, and OC source their list of countries from octodns.record.geo_data
+  rather than manually duplicating the information here.
 * Add TL to the list of special case countries so that it can be individually
   targeted
 * Fix for rule ordering when there's > 10 rules
