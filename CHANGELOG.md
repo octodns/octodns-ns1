@@ -1,4 +1,4 @@
-## v0.0.4 - 2023-??-?? - ???
+## v0.0.4 - 2023-03-31 - More (accurately) Dynamic
 
 * Dynamic records filter chain ordering reworked to place country filters before
   regions, see https://github.com/octodns/octodns-ns1/pull/37 for
