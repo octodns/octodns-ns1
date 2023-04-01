@@ -848,9 +848,25 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertEqual({}, provider._parse_notes('blah-blah-blah'))
 
         # Round tripping
-        data = {'key': 'value', 'priority': '1'}
+        data = {'key': 'value', 'priority': 1}
         notes = provider._encode_notes(data)
         self.assertEqual(data, provider._parse_notes(notes))
+
+        # integers come out as int
+        self.assertEqual(
+            {'rule-order': 1}, provider._parse_notes('rule-order:1')
+        )
+
+        # floats come out as strings (not currently used so not parsed)
+        self.assertEqual(
+            {'rule-order': '1.2'}, provider._parse_notes('rule-order:1.2')
+        )
+
+        # strings that start with integers are still strings
+        self.assertEqual(
+            {'rule-order': '1-thing'},
+            provider._parse_notes('rule-order:1-thing'),
+        )
 
     def test_monitors_for(self):
         provider = Ns1Provider('test', 'api-key')
@@ -1121,6 +1137,14 @@ class TestNs1ProviderDynamic(TestCase):
             )
         )
 
+        # extra stuff in the config section doesn't cause problems
+        self.assertTrue(
+            provider._monitor_is_match(
+                {'config': {'key': 42, 'value': 43}},
+                {'config': {'key': 42, 'value': 43, 'other': 44}},
+            )
+        )
+
     @patch('octodns_ns1.Ns1Provider._feed_create')
     @patch('octodns_ns1.Ns1Client.monitors_update')
     @patch('octodns_ns1.Ns1Provider._monitor_create')
@@ -1368,7 +1392,7 @@ class TestNs1ProviderDynamic(TestCase):
         rule0 = record.data['dynamic']['rules'][0]
         rule1 = record.data['dynamic']['rules'][1]
         rule0['geos'] = ['AF', 'EU']
-        rule1['geos'] = ['AS']
+        rule1['geos'] = ['SA']
         ret, monitor_ids = provider._params_for_A(record)
         self.assertEqual(10, len(ret['answers']))
         self.assertEqual(ret['filters'], provider._FILTER_CHAIN_WITH_REGION)
@@ -1376,7 +1400,10 @@ class TestNs1ProviderDynamic(TestCase):
             {
                 'iad__catchall': {'meta': {'note': 'rule-order:2'}},
                 'iad__georegion': {
-                    'meta': {'georegion': ['ASIAPAC'], 'note': 'rule-order:1'}
+                    'meta': {
+                        'georegion': ['SOUTH-AMERICA'],
+                        'note': 'rule-order:1',
+                    }
                 },
                 'lhr__georegion': {
                     'meta': {
@@ -1471,7 +1498,7 @@ class TestNs1ProviderDynamic(TestCase):
         rule0 = record.data['dynamic']['rules'][0]
         rule1 = record.data['dynamic']['rules'][1]
         rule0['geos'] = ['AF', 'EU', 'NA-US-CA']
-        rule1['geos'] = ['AS', 'AS-IN']
+        rule1['geos'] = ['SA', 'AS-IN']
         ret, _ = provider._params_for_A(record)
 
         self.assertEqual(17, len(ret['answers']))
@@ -1536,7 +1563,10 @@ class TestNs1ProviderDynamic(TestCase):
                     'meta': {'country': ['IN'], 'note': 'rule-order:1'}
                 },
                 'iad__georegion': {
-                    'meta': {'georegion': ['ASIAPAC'], 'note': 'rule-order:1'}
+                    'meta': {
+                        'georegion': ['SOUTH-AMERICA'],
+                        'note': 'rule-order:1',
+                    }
                 },
                 'lhr__country': {
                     'meta': {
@@ -1804,12 +1834,12 @@ class TestNs1ProviderDynamic(TestCase):
                     },
                     'rules': [
                         {
-                            '_order': '1',
+                            '_order': 1,
                             'geos': ['AF', 'NA-CA-NL', 'NA-MX', 'NA-US-OR'],
                             'pool': 'lhr',
                         },
-                        {'_order': '2', 'geos': ['AF-ZW'], 'pool': 'iad'},
-                        {'_order': '3', 'pool': 'iad'},
+                        {'_order': 2, 'geos': ['AF-ZW'], 'pool': 'iad'},
+                        {'_order': 3, 'pool': 'iad'},
                     ],
                 },
                 'ttl': 42,
@@ -1864,7 +1894,7 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertTrue('NA' in data5['dynamic']['rules'][0]['geos'])
 
         # 2. Partial list of countries should return just those
-        partial_na_cntry_list = list(na_countries)[:5] + ['SX', 'UM']
+        partial_na_cntry_list = list(na_countries)[:5] + ['SX']
         ns1_record['regions']['lhr__country']['meta'][
             'country'
         ] = partial_na_cntry_list
@@ -1980,16 +2010,16 @@ class TestNs1ProviderDynamic(TestCase):
                     },
                     'rules': [
                         {
-                            '_order': '1',
+                            '_order': 1,
                             'geos': ['NA-CA', 'NA-US-OR'],
                             'pool': 'one',
                         },
                         {
-                            '_order': '2',
+                            '_order': 2,
                             'geos': ['NA-CA', 'NA-US-OR'],
                             'pool': 'four',
                         },
-                        {'_order': '3', 'pool': 'iad'},
+                        {'_order': 3, 'pool': 'iad'},
                     ],
                 },
                 'ttl': 42,
@@ -2049,7 +2079,7 @@ class TestNs1ProviderDynamic(TestCase):
                             ],
                         }
                     },
-                    'rules': [{'_order': '1', 'pool': 'iad'}],
+                    'rules': [{'_order': 1, 'pool': 'iad'}],
                 },
                 'ttl': 43,
                 'type': 'CNAME',
@@ -2845,3 +2875,20 @@ class TestNs1Client(TestCase):
             client._records_cache,
         )
         self.assertEqual({}, client._zones_cache)
+
+    def test_parse_rule_geos_special_cases(self):
+        provider = Ns1Provider('test', 'api-key')
+
+        notes = {}
+
+        meta = {'country': ('TL',)}
+        geos = provider._parse_rule_geos(meta, notes)
+        self.assertEqual({'AS-TL'}, geos)
+
+        meta = {'country': ('SX',)}
+        geos = provider._parse_rule_geos(meta, notes)
+        self.assertEqual({'NA-SX'}, geos)
+
+        meta = {'country': ('PN', 'UM')}
+        geos = provider._parse_rule_geos(meta, notes)
+        self.assertEqual({'OC-PN', 'OC-UM'}, geos)

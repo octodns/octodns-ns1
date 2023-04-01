@@ -16,6 +16,7 @@ from pycountry_convert import country_alpha2_to_continent_code
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
 from octodns.record import Record, Update
+from octodns.record.geo_data import geo_data
 
 __VERSION__ = '0.0.3'
 
@@ -401,84 +402,15 @@ class Ns1Provider(BaseProvider):
     }
     _CONTINENT_TO_REGIONS = {
         'AF': ('AFRICA',),
-        'AS': ('ASIAPAC',),
         'EU': ('EUROPE',),
         'SA': ('SOUTH-AMERICA',),
     }
 
     # Necessary for handling unsupported continents in _CONTINENT_TO_REGIONS
     _CONTINENT_TO_LIST_OF_COUNTRIES = {
-        'OC': {
-            'FJ',
-            'NC',
-            'PG',
-            'SB',
-            'VU',
-            'AU',
-            'NF',
-            'NZ',
-            'FM',
-            'GU',
-            'KI',
-            'MH',
-            'MP',
-            'NR',
-            'PW',
-            'AS',
-            'CK',
-            'NU',
-            'PF',
-            'PN',
-            'TK',
-            'TO',
-            'TV',
-            'WF',
-            'WS',
-        },
-        'NA': {
-            'DO',
-            'DM',
-            'BB',
-            'BL',
-            'BM',
-            'HT',
-            'KN',
-            'JM',
-            'VC',
-            'HN',
-            'BS',
-            'BZ',
-            'PR',
-            'NI',
-            'LC',
-            'TT',
-            'VG',
-            'PA',
-            'TC',
-            'PM',
-            'GT',
-            'AG',
-            'GP',
-            'AI',
-            'VI',
-            'CA',
-            'GD',
-            'AW',
-            'CR',
-            'GL',
-            'CU',
-            'MF',
-            'SV',
-            'US',
-            'MQ',
-            'MS',
-            'KY',
-            'MX',
-            'CW',
-            'BQ',
-            'SX',
-            'UM',
-        },
+        'AS': set(geo_data['AS'].keys()),
+        'OC': set(geo_data['OC'].keys()),
+        'NA': set(geo_data['NA'].keys()),
     }
 
     def __init__(
@@ -550,9 +482,13 @@ class Ns1Provider(BaseProvider):
             for piece in note.split(' '):
                 try:
                     k, v = piece.split(':', 1)
-                    data[k] = v if v != '' else None
+                except ValueError:
+                    continue
+                try:
+                    v = int(v)
                 except ValueError:
                     pass
+                data[k] = v if v != '' else None
         return data
 
     def _data_for_geo_A(self, _type, record):
@@ -684,10 +620,12 @@ class Ns1Provider(BaseProvider):
             # country_alpha2_to_continent_code fails for Pitcairn ('PN'),
             # United States Minor Outlying Islands ('UM') and
             # Sint Maarten ('SX')
-            if country == 'PN':
-                con = 'OC'
-            elif country in ['SX', 'UM']:
+            if country == 'TL':
+                con = 'AS'
+            elif country == 'SX':
                 con = 'NA'
+            elif country in ('PN', 'UM'):
+                con = 'OC'
             else:
                 con = country_alpha2_to_continent_code(country)
 
@@ -1197,7 +1135,14 @@ class Ns1Provider(BaseProvider):
         # Make sure what we have matches what's in expected exactly. Anything
         # else in have will be ignored.
         for k, v in expected.items():
-            if have.get(k, '--missing--') != v:
+            if k == 'config':
+                # config is a nested dict and we need to only consider keys in
+                # expected for it as well
+                have_config = have.get(k, {})
+                for k, v in v.items():
+                    if have_config.get(k, '--missing--') != v:
+                        return False
+            elif have.get(k, '--missing--') != v:
                 return False
 
         return True
