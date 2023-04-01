@@ -402,13 +402,13 @@ class Ns1Provider(BaseProvider):
     }
     _CONTINENT_TO_REGIONS = {
         'AF': ('AFRICA',),
-        'AS': ('ASIAPAC',),
         'EU': ('EUROPE',),
         'SA': ('SOUTH-AMERICA',),
     }
 
     # Necessary for handling unsupported continents in _CONTINENT_TO_REGIONS
     _CONTINENT_TO_LIST_OF_COUNTRIES = {
+        'AS': set(geo_data['AS'].keys()),
         'OC': set(geo_data['OC'].keys()),
         'NA': set(geo_data['NA'].keys()),
     }
@@ -620,10 +620,12 @@ class Ns1Provider(BaseProvider):
             # country_alpha2_to_continent_code fails for Pitcairn ('PN'),
             # United States Minor Outlying Islands ('UM') and
             # Sint Maarten ('SX')
-            if country in ('PN', 'UM'):
-                con = 'OC'
+            if country == 'TL':
+                con = 'AS'
             elif country == 'SX':
                 con = 'NA'
+            elif country in ('PN', 'UM'):
+                con = 'OC'
             else:
                 con = country_alpha2_to_continent_code(country)
 

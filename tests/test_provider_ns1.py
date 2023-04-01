@@ -1392,7 +1392,7 @@ class TestNs1ProviderDynamic(TestCase):
         rule0 = record.data['dynamic']['rules'][0]
         rule1 = record.data['dynamic']['rules'][1]
         rule0['geos'] = ['AF', 'EU']
-        rule1['geos'] = ['AS']
+        rule1['geos'] = ['SA']
         ret, monitor_ids = provider._params_for_A(record)
         self.assertEqual(10, len(ret['answers']))
         self.assertEqual(ret['filters'], provider._FILTER_CHAIN_WITH_REGION)
@@ -1400,7 +1400,10 @@ class TestNs1ProviderDynamic(TestCase):
             {
                 'iad__catchall': {'meta': {'note': 'rule-order:2'}},
                 'iad__georegion': {
-                    'meta': {'georegion': ['ASIAPAC'], 'note': 'rule-order:1'}
+                    'meta': {
+                        'georegion': ['SOUTH-AMERICA'],
+                        'note': 'rule-order:1',
+                    }
                 },
                 'lhr__georegion': {
                     'meta': {
@@ -1495,7 +1498,7 @@ class TestNs1ProviderDynamic(TestCase):
         rule0 = record.data['dynamic']['rules'][0]
         rule1 = record.data['dynamic']['rules'][1]
         rule0['geos'] = ['AF', 'EU', 'NA-US-CA']
-        rule1['geos'] = ['AS', 'AS-IN']
+        rule1['geos'] = ['SA', 'AS-IN']
         ret, _ = provider._params_for_A(record)
 
         self.assertEqual(17, len(ret['answers']))
@@ -1560,7 +1563,10 @@ class TestNs1ProviderDynamic(TestCase):
                     'meta': {'country': ['IN'], 'note': 'rule-order:1'}
                 },
                 'iad__georegion': {
-                    'meta': {'georegion': ['ASIAPAC'], 'note': 'rule-order:1'}
+                    'meta': {
+                        'georegion': ['SOUTH-AMERICA'],
+                        'note': 'rule-order:1',
+                    }
                 },
                 'lhr__country': {
                     'meta': {
@@ -2869,3 +2875,20 @@ class TestNs1Client(TestCase):
             client._records_cache,
         )
         self.assertEqual({}, client._zones_cache)
+
+    def test_parse_rule_geos_special_cases(self):
+        provider = Ns1Provider('test', 'api-key')
+
+        notes = {}
+
+        meta = {'country': ('TL',)}
+        geos = provider._parse_rule_geos(meta, notes)
+        self.assertEqual({'AS-TL'}, geos)
+
+        meta = {'country': ('SX',)}
+        geos = provider._parse_rule_geos(meta, notes)
+        self.assertEqual({'NA-SX'}, geos)
+
+        meta = {'country': ('PN', 'UM')}
+        geos = provider._parse_rule_geos(meta, notes)
+        self.assertEqual({'OC-PN', 'OC-UM'}, geos)
