@@ -550,9 +550,13 @@ class Ns1Provider(BaseProvider):
             for piece in note.split(' '):
                 try:
                     k, v = piece.split(':', 1)
-                    data[k] = v if v != '' else None
+                except ValueError:
+                    continue
+                try:
+                    v = int(v)
                 except ValueError:
                     pass
+                data[k] = v if v != '' else None
         return data
 
     def _data_for_geo_A(self, _type, record):

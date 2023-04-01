@@ -848,9 +848,25 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertEqual({}, provider._parse_notes('blah-blah-blah'))
 
         # Round tripping
-        data = {'key': 'value', 'priority': '1'}
+        data = {'key': 'value', 'priority': 1}
         notes = provider._encode_notes(data)
         self.assertEqual(data, provider._parse_notes(notes))
+
+        # integers come out as int
+        self.assertEqual(
+            {'rule-order': 1}, provider._parse_notes('rule-order:1')
+        )
+
+        # floats come out as strings (not currently used so not parsed)
+        self.assertEqual(
+            {'rule-order': '1.2'}, provider._parse_notes('rule-order:1.2')
+        )
+
+        # strings that start with integers are still strings
+        self.assertEqual(
+            {'rule-order': '1-thing'},
+            provider._parse_notes('rule-order:1-thing'),
+        )
 
     def test_monitors_for(self):
         provider = Ns1Provider('test', 'api-key')
@@ -1804,12 +1820,12 @@ class TestNs1ProviderDynamic(TestCase):
                     },
                     'rules': [
                         {
-                            '_order': '1',
+                            '_order': 1,
                             'geos': ['AF', 'NA-CA-NL', 'NA-MX', 'NA-US-OR'],
                             'pool': 'lhr',
                         },
-                        {'_order': '2', 'geos': ['AF-ZW'], 'pool': 'iad'},
-                        {'_order': '3', 'pool': 'iad'},
+                        {'_order': 2, 'geos': ['AF-ZW'], 'pool': 'iad'},
+                        {'_order': 3, 'pool': 'iad'},
                     ],
                 },
                 'ttl': 42,
@@ -1980,16 +1996,16 @@ class TestNs1ProviderDynamic(TestCase):
                     },
                     'rules': [
                         {
-                            '_order': '1',
+                            '_order': 1,
                             'geos': ['NA-CA', 'NA-US-OR'],
                             'pool': 'one',
                         },
                         {
-                            '_order': '2',
+                            '_order': 2,
                             'geos': ['NA-CA', 'NA-US-OR'],
                             'pool': 'four',
                         },
-                        {'_order': '3', 'pool': 'iad'},
+                        {'_order': 3, 'pool': 'iad'},
                     ],
                 },
                 'ttl': 42,
@@ -2049,7 +2065,7 @@ class TestNs1ProviderDynamic(TestCase):
                             ],
                         }
                     },
-                    'rules': [{'_order': '1', 'pool': 'iad'}],
+                    'rules': [{'_order': 1, 'pool': 'iad'}],
                 },
                 'ttl': 43,
                 'type': 'CNAME',
