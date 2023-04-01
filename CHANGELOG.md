@@ -4,6 +4,7 @@
   didn't match as the AS list of countries in the first place
 * Add TL to the list of special case countries so that it can be individually
   targeted
+* Fix for rule ordering when there's > 10 rules
 
 ## v0.0.3 - 2023-01-24 - Support the root
 
