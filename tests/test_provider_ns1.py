@@ -1137,6 +1137,14 @@ class TestNs1ProviderDynamic(TestCase):
             )
         )
 
+        # extra stuff in the config section doesn't cause problems
+        self.assertTrue(
+            provider._monitor_is_match(
+                {'config': {'key': 42, 'value': 43}},
+                {'config': {'key': 42, 'value': 43, 'other': 44}},
+            )
+        )
+
     @patch('octodns_ns1.Ns1Provider._feed_create')
     @patch('octodns_ns1.Ns1Client.monitors_update')
     @patch('octodns_ns1.Ns1Provider._monitor_create')
