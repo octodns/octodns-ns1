@@ -5,6 +5,8 @@
 * Add TL to the list of special case countries so that it can be individually
   targeted
 * Fix for rule ordering when there's > 10 rules
+* Fixed persistent change issue with dynamic records after the API started
+  returning new fields under `config`
 
 ## v0.0.3 - 2023-01-24 - Support the root
 
