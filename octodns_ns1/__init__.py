@@ -16,6 +16,7 @@ from pycountry_convert import country_alpha2_to_continent_code
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
 from octodns.record import Record, Update
+from octodns.record.geo_data import geo_data
 
 __VERSION__ = '0.0.3'
 
@@ -408,77 +409,8 @@ class Ns1Provider(BaseProvider):
 
     # Necessary for handling unsupported continents in _CONTINENT_TO_REGIONS
     _CONTINENT_TO_LIST_OF_COUNTRIES = {
-        'OC': {
-            'FJ',
-            'NC',
-            'PG',
-            'SB',
-            'VU',
-            'AU',
-            'NF',
-            'NZ',
-            'FM',
-            'GU',
-            'KI',
-            'MH',
-            'MP',
-            'NR',
-            'PW',
-            'AS',
-            'CK',
-            'NU',
-            'PF',
-            'PN',
-            'TK',
-            'TO',
-            'TV',
-            'WF',
-            'WS',
-        },
-        'NA': {
-            'DO',
-            'DM',
-            'BB',
-            'BL',
-            'BM',
-            'HT',
-            'KN',
-            'JM',
-            'VC',
-            'HN',
-            'BS',
-            'BZ',
-            'PR',
-            'NI',
-            'LC',
-            'TT',
-            'VG',
-            'PA',
-            'TC',
-            'PM',
-            'GT',
-            'AG',
-            'GP',
-            'AI',
-            'VI',
-            'CA',
-            'GD',
-            'AW',
-            'CR',
-            'GL',
-            'CU',
-            'MF',
-            'SV',
-            'US',
-            'MQ',
-            'MS',
-            'KY',
-            'MX',
-            'CW',
-            'BQ',
-            'SX',
-            'UM',
-        },
+        'OC': set(geo_data['OC'].keys()),
+        'NA': set(geo_data['NA'].keys()),
     }
 
     def __init__(
@@ -688,9 +620,9 @@ class Ns1Provider(BaseProvider):
             # country_alpha2_to_continent_code fails for Pitcairn ('PN'),
             # United States Minor Outlying Islands ('UM') and
             # Sint Maarten ('SX')
-            if country == 'PN':
+            if country in ('PN', 'UM'):
                 con = 'OC'
-            elif country in ['SX', 'UM']:
+            elif country == 'SX':
                 con = 'NA'
             else:
                 con = country_alpha2_to_continent_code(country)
