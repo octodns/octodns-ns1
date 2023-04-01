@@ -1,3 +1,7 @@
+## v0.0.4 - 2023-??-?? - ???
+
+* Fix for rule ordering when there's > 10 rules
+
 ## v0.0.3 - 2023-01-24 - Support the root
 
 * Enable SUPPORTS_ROOT_NS for management of root NS records. Requires
