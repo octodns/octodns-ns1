@@ -482,9 +482,13 @@ class Ns1Provider(BaseProvider):
             for piece in note.split(' '):
                 try:
                     k, v = piece.split(':', 1)
-                    data[k] = v if v != '' else None
+                except ValueError:
+                    continue
+                try:
+                    v = int(v)
                 except ValueError:
                     pass
+                data[k] = v if v != '' else None
         return data
 
     def _data_for_geo_A(self, _type, record):
@@ -1129,7 +1133,14 @@ class Ns1Provider(BaseProvider):
         # Make sure what we have matches what's in expected exactly. Anything
         # else in have will be ignored.
         for k, v in expected.items():
-            if have.get(k, '--missing--') != v:
+            if k == 'config':
+                # config is a nested dict and we need to only consider keys in
+                # expected for it as well
+                have_config = have.get(k, {})
+                for k, v in v.items():
+                    if have_config.get(k, '--missing--') != v:
+                        return False
+            elif have.get(k, '--missing--') != v:
                 return False
 
         return True
