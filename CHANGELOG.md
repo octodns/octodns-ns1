@@ -12,6 +12,7 @@
 * Fix for rule ordering when there's > 10 rules
 * Fixed persistent change issue with dynamic records after the API started
   returning new fields under `config`
+* Newly added support for subnet targeting using the Netfence Prefix filter
 
 ## v0.0.3 - 2023-01-24 - Support the root
 
