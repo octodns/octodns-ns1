@@ -519,9 +519,19 @@ class TestNs1Provider(TestCase):
                     'unit.tests',
                     'unit.tests',
                     'A',
-                    answers=[{'answer': ['1.2.3.4'], 'meta': {}}],
-                    filters=[],
+                    answers=['1.2.3.4'],
                     ttl=32,
+                    filters=[],
+                    regions={},
+                ),
+                call(
+                    'unit.tests',
+                    'cname.unit.tests',
+                    'CNAME',
+                    answers=['foo.unit.tests.'],
+                    filters=[],
+                    regions={},
+                    ttl=34,
                 ),
                 call(
                     'unit.tests',
@@ -542,6 +552,8 @@ class TestNs1Provider(TestCase):
                     'unit.tests',
                     'NS',
                     answers=['ns1.unit.tests.', 'ns2.unit.tests.'],
+                    filters=[],
+                    regions={},
                     ttl=37,
                 ),
                 call(
@@ -551,7 +563,8 @@ class TestNs1Provider(TestCase):
                     answers=['one.one.one.one.', 'two.two.two.two.'],
                     ttl=42,
                 ),
-            ]
+            ],
+            any_order=True,
         )
 
         # Update & delete
@@ -635,16 +648,18 @@ class TestNs1Provider(TestCase):
                     'unit.tests',
                     'unit.tests',
                     'A',
-                    answers=[{'answer': ['1.2.3.4'], 'meta': {}}],
+                    answers=['1.2.3.4'],
                     filters=[],
+                    regions={},
                     ttl=32,
                 ),
                 call(
                     'unit.tests',
                     'unit.tests',
                     'A',
-                    answers=[{'answer': ['1.2.3.4'], 'meta': {}}],
+                    answers=['1.2.3.4'],
                     filters=[],
+                    regions={},
                     ttl=32,
                 ),
                 call(
