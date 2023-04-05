@@ -1447,7 +1447,12 @@ class Ns1Provider(BaseProvider):
         elif getattr(record, 'geo', False):
             return self._params_for_geo_A(record)
 
-        return {'answers': record.values, 'ttl': record.ttl}, None
+        return {
+            'answers': record.values,
+            'ttl': record.ttl,
+            'filters': [],
+            'regions': {},
+        }, None
 
     _params_for_AAAA = _params_for_A
     _params_for_NS = _params_for_A
@@ -1469,7 +1474,12 @@ class Ns1Provider(BaseProvider):
         if getattr(record, 'dynamic', False):
             return self._params_for_dynamic(record)
 
-        return {'answers': [record.value], 'ttl': record.ttl}, None
+        return {
+            'answers': [record.value],
+            'ttl': record.ttl,
+            'filters': [],
+            'regions': {},
+        }, None
 
     _params_for_ALIAS = _params_for_CNAME
 
