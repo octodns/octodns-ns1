@@ -520,9 +520,9 @@ class TestNs1Provider(TestCase):
                     'unit.tests',
                     'A',
                     answers=['1.2.3.4'],
+                    ttl=32,
                     filters=[],
                     regions={},
-                    ttl=32,
                 ),
                 call(
                     'unit.tests',
@@ -644,20 +644,10 @@ class TestNs1Provider(TestCase):
         record_update_mock.assert_has_calls(
             [
                 call(
-                    'unit.tests',
-                    'unit.tests',
-                    'A',
-                    answers=[{'answer': ['1.2.3.4'], 'meta': {}}],
-                    filters=[],
-                    ttl=32,
+                    'unit.tests', 'unit.tests', 'A', answers=['1.2.3.4'], ttl=32
                 ),
                 call(
-                    'unit.tests',
-                    'unit.tests',
-                    'A',
-                    answers=[{'answer': ['1.2.3.4'], 'meta': {}}],
-                    filters=[],
-                    ttl=32,
+                    'unit.tests', 'unit.tests', 'A', answers=['1.2.3.4'], ttl=32
                 ),
                 call(
                     'unit.tests',

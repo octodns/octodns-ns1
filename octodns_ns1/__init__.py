@@ -1444,7 +1444,7 @@ class Ns1Provider(BaseProvider):
     def _params_for_A(self, record):
         if getattr(record, 'dynamic', False):
             return self._params_for_dynamic(record)
-        elif hasattr(record, 'geo'):
+        elif getattr(record, 'geo', False):
             return self._params_for_geo_A(record)
 
         return {
