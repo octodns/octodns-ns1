@@ -563,7 +563,8 @@ class TestNs1Provider(TestCase):
                     answers=['one.one.one.one.', 'two.two.two.two.'],
                     ttl=42,
                 ),
-            ]
+            ],
+            any_order=True,
         )
 
         # Update & delete
@@ -644,10 +645,22 @@ class TestNs1Provider(TestCase):
         record_update_mock.assert_has_calls(
             [
                 call(
-                    'unit.tests', 'unit.tests', 'A', answers=['1.2.3.4'], ttl=32
+                    'unit.tests',
+                    'unit.tests',
+                    'A',
+                    answers=['1.2.3.4'],
+                    filters=[],
+                    regions={},
+                    ttl=32,
                 ),
                 call(
-                    'unit.tests', 'unit.tests', 'A', answers=['1.2.3.4'], ttl=32
+                    'unit.tests',
+                    'unit.tests',
+                    'A',
+                    answers=['1.2.3.4'],
+                    filters=[],
+                    regions={},
+                    ttl=32,
                 ),
                 call(
                     'unit.tests',
