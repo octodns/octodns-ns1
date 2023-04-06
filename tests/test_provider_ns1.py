@@ -765,7 +765,7 @@ class TestNs1ProviderDynamic(TestCase):
                     },
                     'rules': [
                         {'geos': ['AF', 'EU-GB', 'NA-US-FL'], 'pool': 'lhr'},
-                        {'geos': ['AF-ZW'], 'pool': 'iad'},
+                        {'geos': ['NA-US'], 'pool': 'iad'},
                         {'pool': 'iad'},
                     ],
                 },
@@ -810,7 +810,7 @@ class TestNs1ProviderDynamic(TestCase):
                     },
                     'rules': [
                         {'geos': ['AF', 'EU-GB', 'NA-US-FL'], 'pool': 'lhr'},
-                        {'geos': ['AF-ZW'], 'pool': 'iad'},
+                        {'geos': ['NA-US'], 'pool': 'iad'},
                         {'pool': 'iad'},
                     ],
                 },
@@ -2151,6 +2151,7 @@ class TestNs1ProviderDynamic(TestCase):
                 'rules': [
                     {'geos': ['NA-US'], 'pool': 'iad'},
                     {'geos': ['NA'], 'pool': 'lhr'},
+                    {'pool': 'iad'},
                 ],
             },
             'ttl': 33,
@@ -2163,7 +2164,7 @@ class TestNs1ProviderDynamic(TestCase):
         regions = [
             r
             for r in ns1_record['regions'].values()
-            if 'US' in r['meta']['country']
+            if 'US' in r['meta'].get('country', [])
         ]
         self.assertEqual(len(regions), 1)
 
