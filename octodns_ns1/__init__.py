@@ -18,7 +18,7 @@ from octodns.provider.base import BaseProvider
 from octodns.record import Record, Update
 from octodns.record.geo_data import geo_data
 
-__VERSION__ = '0.0.3'
+__VERSION__ = '0.0.4'
 
 
 def _ensure_endswith_dot(string):
@@ -1525,10 +1525,15 @@ class Ns1Provider(BaseProvider):
     def _params_for_A(self, record):
         if getattr(record, 'dynamic', False):
             return self._params_for_dynamic(record)
-        elif hasattr(record, 'geo'):
+        elif getattr(record, 'geo', False):
             return self._params_for_geo_A(record)
 
-        return {'answers': record.values, 'ttl': record.ttl}, None
+        return {
+            'answers': record.values,
+            'ttl': record.ttl,
+            'filters': [],
+            'regions': {},
+        }, None
 
     _params_for_AAAA = _params_for_A
     _params_for_NS = _params_for_A
@@ -1550,7 +1555,12 @@ class Ns1Provider(BaseProvider):
         if getattr(record, 'dynamic', False):
             return self._params_for_dynamic(record)
 
-        return {'answers': [record.value], 'ttl': record.ttl}, None
+        return {
+            'answers': [record.value],
+            'ttl': record.ttl,
+            'filters': [],
+            'regions': {},
+        }, None
 
     _params_for_ALIAS = _params_for_CNAME
 

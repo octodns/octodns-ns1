@@ -1,4 +1,8 @@
-## v0.0.4 - 2023-??-?? - ???
+## v0.0.5 - 2023-??-??
+
+* Newly added support for subnet targeting using the Netfence Prefix filter
+
+## v0.0.4 - 2023-04-06 - More (accurately) Dynamic
 
 * Dynamic records filter chain ordering reworked to place country filters before
   regions, see https://github.com/octodns/octodns-ns1/pull/37 for
@@ -12,7 +16,8 @@
 * Fix for rule ordering when there's > 10 rules
 * Fixed persistent change issue with dynamic records after the API started
   returning new fields under `config`
-* Newly added support for subnet targeting using the Netfence Prefix filter
+* Fixed persistent change bug when a dynamic record is updated to be a
+  non-dynamic simple record
 
 ## v0.0.3 - 2023-01-24 - Support the root
 
