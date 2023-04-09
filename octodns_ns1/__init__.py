@@ -285,6 +285,7 @@ class Ns1Provider(BaseProvider):
     SUPPORTS_GEO = True
     SUPPORTS_DYNAMIC = True
     SUPPORTS_POOL_VALUE_STATUS = True
+    SUPPORTS_DYNAMIC_SUBNETS = True
     SUPPORTS_MULTIVALUE_PTR = True
     SUPPORTS_ROOT_NS = True
     SUPPORTS = set(
