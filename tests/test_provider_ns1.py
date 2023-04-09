@@ -1746,7 +1746,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         # Test out a small, but realistic setup that covers all the options
         # We have country and region in the test config
-        filters = provider._get_updated_filter_chain(True, True)
+        filters = provider._get_updated_filter_chain(True, True, False)
         catchall_pool_name = 'iad__catchall'
         ns1_record = {
             'answers': [
@@ -2051,7 +2051,7 @@ class TestNs1ProviderDynamic(TestCase):
         # Everything else is same as dynamic A whose tests will cover all
         # other options and test cases
         # Not testing for geo/region specific cases
-        filters = provider._get_updated_filter_chain(False, False)
+        filters = provider._get_updated_filter_chain(False, False, False)
         catchall_pool_name = 'iad__catchall'
         ns1_record = {
             'answers': [
@@ -2108,7 +2108,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         # Potential setup created outside of octoDNS, so it could be missing
         # notes and region names can be arbitrary
-        filters = provider._get_updated_filter_chain(False, False)
+        filters = provider._get_updated_filter_chain(False, False, False)
         ns1_record = {
             'answers': [
                 {
@@ -2249,7 +2249,9 @@ class TestNs1ProviderDynamic(TestCase):
         reset()
         # Generate what we expect to have
         provider.record_filters[dynamic.fqdn[:-1]] = {
-            dynamic._type: provider._get_updated_filter_chain(False, False)
+            dynamic._type: provider._get_updated_filter_chain(
+                False, False, False
+            )
         }
         gend = provider._monitor_gen(dynamic, '1.2.3.4')
         gend.update(
