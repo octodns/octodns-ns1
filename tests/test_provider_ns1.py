@@ -889,7 +889,7 @@ class TestNs1ProviderDynamic(TestCase):
         # pre-populate the client's monitors cache
         monitor_one = {
             'config': {'host': '1.2.3.4'},
-            'notes': 'host:unit.tests type:A',
+            'notes': 'host:unit.tests type:A value:1.2.3.4',
         }
         monitor_four = {
             'config': {'host': '2.3.4.5'},
@@ -897,7 +897,7 @@ class TestNs1ProviderDynamic(TestCase):
         }
         monitor_five = {
             'config': {'host': 'iad.unit.tests'},
-            'notes': 'host:foo.unit.tests type:CNAME',
+            'notes': 'host:foo.unit.tests type:CNAME value:iad.unit.tests',
         }
         provider._client._monitors_cache = {
             'one': monitor_one,
@@ -907,7 +907,7 @@ class TestNs1ProviderDynamic(TestCase):
             },
             'three': {
                 'config': {'host': '9.9.9.9'},
-                'notes': 'host:other.unit.tests type:A',
+                'notes': 'host:other.unit.tests type:A value:9.9.9.9',
             },
             'four': monitor_four,
             'five': monitor_five,
@@ -1055,18 +1055,27 @@ class TestNs1ProviderDynamic(TestCase):
         value = '3.4.5.6'
         record = self.record()
         monitor = provider._monitor_gen(record, value)
-        self.assertEqual(value, monitor['config']['host'])
-        self.assertTrue('\\nHost: send.me\\r' in monitor['config']['send'])
-        self.assertFalse(monitor['config']['ssl'])
-        self.assertEqual('host:unit.tests type:A', monitor['notes'])
+        self.assertEqual(f'http://{value}:80/_ping', monitor['config']['url'])
+        self.assertEqual('send.me', monitor['config']['virtual_host'])
+        self.assertEqual(
+            f'host:unit.tests type:A value:{value}', monitor['notes']
+        )
 
         record._octodns['healthcheck']['host'] = None
         monitor = provider._monitor_gen(record, value)
-        self.assertTrue(r'\nHost: 3.4.5.6\r' in monitor['config']['send'])
+        self.assertEqual(value, monitor['config']['virtual_host'])
 
         record._octodns['healthcheck']['protocol'] = 'HTTPS'
         monitor = provider._monitor_gen(record, value)
-        self.assertTrue(monitor['config']['ssl'])
+        self.assertTrue(monitor['config']['url'].startswith('https://'))
+
+        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(1, monitor['config']['connect_timeout'])
+
+        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(2, monitor['config']['idle_timeout'])
 
         record._octodns['healthcheck']['protocol'] = 'TCP'
         monitor = provider._monitor_gen(record, value)
@@ -1095,15 +1104,6 @@ class TestNs1ProviderDynamic(TestCase):
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2000, monitor['config']['response_timeout'])
 
-        # Test http version validation
-        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
-        with self.assertRaisesRegex(
-            Ns1Exception,
-            r"unsupported http version found: 'invalid'. Expected version in \('HTTP/1.0', 'HTTP/1.1'\)",
-        ):
-            provider._healthcheck_http_version(record)
-        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
-
     def test_monitor_gen_AAAA(self):
         provider = Ns1Provider('test', 'api-key')
 
@@ -1111,6 +1111,7 @@ class TestNs1ProviderDynamic(TestCase):
         record = self.aaaa_record()
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(monitor['config']['ipv6'])
+        self.assertTrue(f'[{value}]' in monitor['config']['url'])
 
     def test_monitor_gen_CNAME(self):
         provider = Ns1Provider('test', 'api-key')
@@ -1118,7 +1119,7 @@ class TestNs1ProviderDynamic(TestCase):
         value = 'iad.unit.tests.'
         record = self.cname_record()
         monitor = provider._monitor_gen(record, value)
-        self.assertEqual(value[:-1], monitor['config']['host'])
+        self.assertTrue(value[:-1] in monitor['config']['url'])
 
     def test_monitor_is_match(self):
         provider = Ns1Provider('test', 'api-key')

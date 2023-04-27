@@ -1,3 +1,9 @@
+## v0.0.5 - 2023-??-?? - ???
+
+* Switch to using actual HTTP monitors instead of emulating them in TCP monitors.
+  This effectively drops support for `http_version` configuration because HTTP
+  monitors use HTTP/1.1 only.
+
 ## v0.0.4 - 2023-04-06 - More (accurately) Dynamic
 
 * Dynamic records filter chain ordering reworked to place country filters before
