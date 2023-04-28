@@ -1030,6 +1030,23 @@ class Ns1Provider(BaseProvider):
 
         return monitor_id, self._feed_create(monitor)
 
+    def _monitor_delete(self, monitor):
+        monitor_id = monitor['id']
+        feed_id = self._client.feeds_for_monitors.get(monitor_id)
+        if feed_id:
+            self._client.datafeed_delete(self._client.datasource_id, feed_id)
+
+        self._client.monitors_delete(monitor_id)
+
+        notify_list_id = monitor['notify_list']
+        for nl_name, nl in self._client.notifylists.items():
+            if nl['id'] == notify_list_id:
+                # We've found the that might need deleting
+                if nl['name'] != self.SHARED_NOTIFYLIST_NAME:
+                    # It's not shared so is safe to delete
+                    self._client.notifylists_delete(notify_list_id)
+                break
+
     def _healthcheck_policy(self, record):
         return (
             record._octodns.get('ns1', {})
@@ -1163,21 +1180,32 @@ class Ns1Provider(BaseProvider):
         if existing:
             self.log.debug('_monitor_sync:   existing=%s', existing['id'])
             monitor_id = existing['id']
+            feed_id = None
 
             if not self._monitor_is_match(expected, existing):
-                self.log.debug('_monitor_sync:   existing needs update')
-                # Update the monitor to match expected, everything else will be
-                # left alone and assumed correct
-                self._client.monitors_update(monitor_id, **expected)
+                if expected['job_type'] == existing['job_type']:
+                    self.log.debug('_monitor_sync:   existing needs update')
+                    # Update the monitor to match expected, everything else will be
+                    # left alone and assumed correct
+                    self._client.monitors_update(monitor_id, **expected)
+                else:
+                    # NS1 monitor job types cannot be changed, so we will do a
+                    # delete+create
+                    self.log.debug(
+                        '_monitor_sync: existing needs to be replaced (delete+create new)'
+                    )
+                    self._monitor_delete(existing)
+                    monitor_id, feed_id = self._monitor_create(expected)
 
-            feed_id = self._client.feeds_for_monitors.get(monitor_id)
-            if feed_id is None:
-                self.log.warning(
-                    '_monitor_sync: %s (%s) missing feed, creating',
-                    existing['name'],
-                    monitor_id,
-                )
-                feed_id = self._feed_create(existing)
+            if not feed_id:
+                feed_id = self._client.feeds_for_monitors.get(monitor_id)
+                if feed_id is None:
+                    self.log.warning(
+                        '_monitor_sync: %s (%s) missing feed, creating',
+                        existing['name'],
+                        monitor_id,
+                    )
+                    feed_id = self._feed_create(existing)
         else:
             self.log.debug('_monitor_sync:   needs create')
             # We don't have an existing monitor create it (and related bits)
@@ -1202,22 +1230,7 @@ class Ns1Provider(BaseProvider):
 
             self.log.debug('_monitors_gc:   deleting %s', monitor_id)
 
-            feed_id = self._client.feeds_for_monitors.get(monitor_id)
-            if feed_id:
-                self._client.datafeed_delete(
-                    self._client.datasource_id, feed_id
-                )
-
-            self._client.monitors_delete(monitor_id)
-
-            notify_list_id = monitor['notify_list']
-            for nl_name, nl in self._client.notifylists.items():
-                if nl['id'] == notify_list_id:
-                    # We've found the that might need deleting
-                    if nl['name'] != self.SHARED_NOTIFYLIST_NAME:
-                        # It's not shared so is safe to delete
-                        self._client.notifylists_delete(notify_list_id)
-                    break
+            self._monitor_delete(monitor)
 
     def _add_answers_for_pool(
         self,

@@ -1174,6 +1174,7 @@ class TestNs1ProviderDynamic(TestCase):
         )
 
     @patch('octodns_ns1.Ns1Provider._feed_create')
+    @patch('octodns_ns1.Ns1Provider._monitor_delete')
     @patch('octodns_ns1.Ns1Client.monitors_update')
     @patch('octodns_ns1.Ns1Provider._monitor_create')
     @patch('octodns_ns1.Ns1Provider._monitor_gen')
@@ -1182,6 +1183,7 @@ class TestNs1ProviderDynamic(TestCase):
         monitor_gen_mock,
         monitor_create_mock,
         monitors_update_mock,
+        monitor_delete_mock,
         feed_create_mock,
     ):
         provider = Ns1Provider('test', 'api-key')
@@ -1236,17 +1238,34 @@ class TestNs1ProviderDynamic(TestCase):
         monitors_update_mock.assert_not_called()
         feed_create_mock.assert_has_calls([call(monitor)])
 
-        # Existing monitor that needs updates
+        # Existing monitor of same job_type that needs updates
         reset()
-        monitor = {'id': 'mon-id', 'key': 'value', 'name': 'monitor name'}
-        gened = {'other': 'thing'}
+        monitor = {'id': 'mon-id', 'job_type': 'value', 'name': 'monitor name'}
+        gened = {'other': 'thing', 'job_type': 'value'}
         monitor_gen_mock.side_effect = [gened]
         monitor_id, feed_id = provider._monitor_sync(record, value, monitor)
         self.assertEqual('mon-id', monitor_id)
         self.assertEqual('feed-id', feed_id)
         monitor_gen_mock.assert_called_once()
         monitor_create_mock.assert_not_called()
-        monitors_update_mock.assert_has_calls([call('mon-id', other='thing')])
+        monitors_update_mock.assert_has_calls(
+            [call('mon-id', other='thing', job_type='value')]
+        )
+        feed_create_mock.assert_not_called()
+
+        # Existing monitor of different job_type that needs updates
+        reset()
+        monitor = {'id': 'mon-id', 'job_type': 'value', 'name': 'monitor name'}
+        gened = {'other': 'thing', 'job_type': 'value2'}
+        monitor_gen_mock.side_effect = [gened]
+        monitor_create_mock.side_effect = [('mon-id3', 'feed-id3')]
+        monitor_id, feed_id = provider._monitor_sync(record, value, monitor)
+        self.assertEqual('mon-id3', monitor_id)
+        self.assertEqual('feed-id3', feed_id)
+        monitor_gen_mock.assert_called_once()
+        monitor_delete_mock.assert_has_calls([call(monitor)])
+        monitor_create_mock.assert_has_calls([call(gened)])
+        monitors_update_mock.assert_not_called()
         feed_create_mock.assert_not_called()
 
     @patch('octodns_ns1.Ns1Client.notifylists_delete')
