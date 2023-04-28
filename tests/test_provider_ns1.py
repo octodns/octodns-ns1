@@ -1161,6 +1161,18 @@ class TestNs1ProviderDynamic(TestCase):
             )
         )
 
+        # missing regions causes mismatch
+        self.assertFalse(
+            provider._monitor_is_match({'regions': ['lga', 'sin']}, {})
+        )
+
+        # out of order regions doesn't cause mismatch
+        self.assertTrue(
+            provider._monitor_is_match(
+                {'regions': ['lga', 'sin']}, {'regions': ['sin', 'lga']}
+            )
+        )
+
     @patch('octodns_ns1.Ns1Provider._feed_create')
     @patch('octodns_ns1.Ns1Client.monitors_update')
     @patch('octodns_ns1.Ns1Provider._monitor_create')
