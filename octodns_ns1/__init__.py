@@ -1102,9 +1102,7 @@ class Ns1Provider(BaseProvider):
         else:
             ret['job_type'] = 'http'
             proto = record.healthcheck_protocol.lower()
-            domain = value
-            if _type == 'AAAA':
-                domain = f'[{domain}]'
+            domain = f'[{value}]' if _type == 'AAAA' else value
             port = record.healthcheck_port
             path = record.healthcheck_path
             ret['config'] = {
