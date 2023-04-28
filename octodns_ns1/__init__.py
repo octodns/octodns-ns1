@@ -418,7 +418,7 @@ class Ns1Provider(BaseProvider):
         id,
         api_key,
         retry_count=4,
-        monitor_regions=None,
+        monitor_regions=[],
         parallelism=None,
         client_config=None,
         shared_notifylist=False,
@@ -1134,6 +1134,10 @@ class Ns1Provider(BaseProvider):
     def _monitor_is_match(self, expected, have):
         # Make sure what we have matches what's in expected exactly. Anything
         # else in have will be ignored.
+        log_prefix = 'monitor mismatch'
+        if 'name' in have:
+            name = have['name']
+            log_prefix = f'monitor "{name}" mismatch'
         for k, v in expected.items():
             if k == 'config':
                 # config is a nested dict and we need to only consider keys in
@@ -1141,8 +1145,21 @@ class Ns1Provider(BaseProvider):
                 have_config = have.get(k, {})
                 for k, v in v.items():
                     if have_config.get(k, '--missing--') != v:
+                        self.log.info(
+                            f'{log_prefix}: got config.{k}={have_config.get(k)}, expected {v}'
+                        )
                         return False
+            elif k == 'regions':
+                # regions can be out of order
+                if set(have.get(k, [])) != set(v):
+                    self.log.info(
+                        f'{log_prefix}: got {k}={have.get(k)}, expected {v}'
+                    )
+                    return False
             elif have.get(k, '--missing--') != v:
+                self.log.info(
+                    f'{log_prefix}: got {k}={have.get(k)}, expected {v}'
+                )
                 return False
 
         return True
@@ -1604,7 +1621,7 @@ class Ns1Provider(BaseProvider):
         # Make sure that if we're going to make any dynamic changes that we
         # have monitor_regions configured before touching anything so we can
         # abort early and not half-apply
-        if self._has_dynamic(changes) and self.monitor_regions is None:
+        if self._has_dynamic(changes) and not self.monitor_regions:
             raise Ns1Exception('Monitored record, but monitor_regions not set')
 
         domain_name = desired.name[:-1]
