@@ -1,8 +1,10 @@
 ## v0.0.5 - 2023-??-?? - ???
 
-* Switch to using actual HTTP monitors instead of emulating them in TCP monitors.
-  This effectively drops support for `http_version` configuration because HTTP
-  monitors use HTTP/1.1 only.
+* Allow using actual HTTP monitors instead of emulating them in TCP monitors.
+  Doing this is not forward-compatible, ie octodns-ns1 cannot be downgraded to
+  a previous version that doesn't support modern HTTP monitors. It also doesn't
+  honor the `http_version` configuration because these monitors can only talk
+  HTTP/1.1.
 
 ## v0.0.4 - 2023-04-06 - More (accurately) Dynamic
 

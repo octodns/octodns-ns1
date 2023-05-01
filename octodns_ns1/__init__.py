@@ -422,6 +422,8 @@ class Ns1Provider(BaseProvider):
         parallelism=None,
         client_config=None,
         shared_notifylist=False,
+        use_http_monitors=False,
+        default_healthcheck_http_version="HTTP/1.0",
         *args,
         **kwargs,
     ):
@@ -429,19 +431,26 @@ class Ns1Provider(BaseProvider):
         self.log.debug(
             '__init__: id=%s, api_key=***, retry_count=%d, '
             'monitor_regions=%s, parallelism=%s, client_config=%s',
+            'shared_notifylist=%s, use_http_monitors=%s',
+            'default_healthcheck_http_version=%s',
             id,
             retry_count,
             monitor_regions,
             parallelism,
             client_config,
+            shared_notifylist,
+            use_http_monitors,
+            default_healthcheck_http_version,
         )
         super().__init__(id, *args, **kwargs)
         self.monitor_regions = monitor_regions
         self.shared_notifylist = shared_notifylist
+        self.use_http_monitors = use_http_monitors
         self.record_filters = dict()
         self._client = Ns1Client(
             api_key, parallelism, retry_count, client_config
         )
+        self.default_healthcheck_http_version = default_healthcheck_http_version
 
     def _sanitize_disabled_in_filter_config(self, filter_cfg):
         # remove disabled=False from filters
@@ -1082,6 +1091,19 @@ class Ns1Provider(BaseProvider):
             .get('response_timeout', 10)
         )
 
+    def _healthcheck_http_version(self, record):
+        http_version = (
+            record._octodns.get("ns1", {})
+            .get("healthcheck", {})
+            .get("http_version", self.default_healthcheck_http_version)
+        )
+        acceptable_http_versions = ("HTTP/1.0", "HTTP/1.1")
+        if http_version not in acceptable_http_versions:
+            raise Ns1Exception(
+                f"unsupported http version found: {http_version!r}. Expected version in {acceptable_http_versions}"
+            )
+        return http_version
+
     def _monitor_gen(self, record, value):
         host = record.fqdn[:-1]
         _type = record._type
@@ -1093,9 +1115,7 @@ class Ns1Provider(BaseProvider):
         ret = {
             'active': True,
             'name': f'{host} - {_type} - {value}',
-            'notes': self._encode_notes(
-                {'host': host, 'type': _type, 'value': value}
-            ),
+            'notes': {'host': host, 'type': _type},
             'policy': self._healthcheck_policy(record),
             'frequency': self._healthcheck_frequency(record),
             'rapid_recheck': self._healthcheck_rapid_recheck(record),
@@ -1106,7 +1126,7 @@ class Ns1Provider(BaseProvider):
         connect_timeout = self._healthcheck_connect_timeout(record)
         response_timeout = self._healthcheck_response_timeout(record)
 
-        if record.healthcheck_protocol == 'TCP':
+        if record.healthcheck_protocol == 'TCP' or not self.use_http_monitors:
             ret['job_type'] = 'tcp'
             ret['config'] = {
                 'host': value,
@@ -1114,9 +1134,30 @@ class Ns1Provider(BaseProvider):
                 # TCP monitors use milliseconds, so convert from seconds to milliseconds
                 'connect_timeout': connect_timeout * 1000,
                 'response_timeout': response_timeout * 1000,
-                'ssl': False,
+                'ssl': record.healthcheck_protocol == 'HTTPS',
             }
+
+            if record.healthcheck_protocol != 'TCP':
+                # legacy HTTP-emulating TCP monitor
+                # we need to send the HTTP request string
+                path = record.healthcheck_path
+                host = record.healthcheck_host(value=value)
+                http_version = self._healthcheck_http_version(record)
+                request = (
+                    fr'GET {path} {http_version}\r\nHost: {host}\r\n'
+                    r'User-agent: NS1\r\n\r\n'
+                )
+                ret['config']['send'] = request
+                # We'll also expect a HTTP response
+                ret['rules'] = [
+                    {
+                        'comparison': 'contains',
+                        'key': 'output',
+                        'value': '200 OK',
+                    }
+                ]
         else:
+            # modern HTTP monitor
             ret['job_type'] = 'http'
             proto = record.healthcheck_protocol.lower()
             domain = f'[{value}]' if _type == 'AAAA' else value
@@ -1137,6 +1178,10 @@ class Ns1Provider(BaseProvider):
 
         if _type == 'AAAA':
             ret['config']['ipv6'] = True
+
+        if self.use_http_monitors:
+            ret['notes']['value'] = value
+        ret['notes'] = self._encode_notes(ret['notes'])
 
         return ret
 

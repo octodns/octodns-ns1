@@ -889,7 +889,7 @@ class TestNs1ProviderDynamic(TestCase):
         # pre-populate the client's monitors cache
         monitor_one = {
             'config': {'host': '1.2.3.4'},
-            'notes': 'host:unit.tests type:A value:1.2.3.4',
+            'notes': 'host:unit.tests type:A',
         }
         monitor_four = {
             'config': {'host': '2.3.4.5'},
@@ -897,6 +897,10 @@ class TestNs1ProviderDynamic(TestCase):
         }
         monitor_five = {
             'config': {'host': 'iad.unit.tests'},
+            'notes': 'host:foo.unit.tests type:CNAME',
+        }
+        monitor_eight = {
+            'config': {'url': 'https://iad.unit.tests/_ping'},
             'notes': 'host:foo.unit.tests type:CNAME value:iad.unit.tests',
         }
         provider._client._monitors_cache = {
@@ -907,7 +911,7 @@ class TestNs1ProviderDynamic(TestCase):
             },
             'three': {
                 'config': {'host': '9.9.9.9'},
-                'notes': 'host:other.unit.tests type:A value:9.9.9.9',
+                'notes': 'host:other.unit.tests type:A',
             },
             'four': monitor_four,
             'five': monitor_five,
@@ -935,6 +939,13 @@ class TestNs1ProviderDynamic(TestCase):
         # Check match for CNAME values
         self.assertEqual(
             {'iad.unit.tests.': monitor_five},
+            provider._monitors_for(self.cname_record()),
+        )
+
+        # Check for HTTP monitors match from notes
+        provider._client._monitors_cache['eight'] = monitor_eight
+        self.assertEqual(
+            {'iad.unit.tests.': monitor_eight},
             provider._monitors_for(self.cname_record()),
         )
 
@@ -1055,30 +1066,32 @@ class TestNs1ProviderDynamic(TestCase):
         value = '3.4.5.6'
         record = self.record()
         monitor = provider._monitor_gen(record, value)
-        self.assertEqual(f'http://{value}:80/_ping', monitor['config']['url'])
-        self.assertEqual('send.me', monitor['config']['virtual_host'])
-        self.assertEqual(
-            f'host:unit.tests type:A value:{value}', monitor['notes']
-        )
+        self.assertEqual('tcp', monitor['job_type'])
+        self.assertEqual(value, monitor['config']['host'])
+        self.assertTrue('\\nHost: send.me\\r' in monitor['config']['send'])
+        self.assertFalse(monitor['config']['ssl'])
+        self.assertEqual('host:unit.tests type:A', monitor['notes'])
 
         record._octodns['healthcheck']['host'] = None
         monitor = provider._monitor_gen(record, value)
-        self.assertEqual(value, monitor['config']['virtual_host'])
+        self.assertTrue(r'\nHost: 3.4.5.6\r' in monitor['config']['send'])
+
+        # Test http version validation
+        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
+        with self.assertRaisesRegex(
+            Ns1Exception,
+            r"unsupported http version found: 'invalid'. Expected version in \('HTTP/1.0', 'HTTP/1.1'\)",
+        ):
+            provider._monitor_gen(record, value)
+        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
 
         record._octodns['healthcheck']['protocol'] = 'HTTPS'
         monitor = provider._monitor_gen(record, value)
-        self.assertTrue(monitor['config']['url'].startswith('https://'))
-
-        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
-        monitor = provider._monitor_gen(record, value)
-        self.assertEqual(1, monitor['config']['connect_timeout'])
-
-        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
-        monitor = provider._monitor_gen(record, value)
-        self.assertEqual(2, monitor['config']['idle_timeout'])
+        self.assertTrue(monitor['config']['ssl'])
 
         record._octodns['healthcheck']['protocol'] = 'TCP'
         monitor = provider._monitor_gen(record, value)
+        self.assertEqual('tcp', monitor['job_type'])
         # No http send done
         self.assertFalse('send' in monitor['config'])
         # No http response expected
@@ -1104,8 +1117,58 @@ class TestNs1ProviderDynamic(TestCase):
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2000, monitor['config']['response_timeout'])
 
-    def test_monitor_gen_AAAA(self):
-        provider = Ns1Provider('test', 'api-key')
+    def test_monitor_gen_http(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
+
+        value = '3.4.5.6'
+        record = self.record()
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('http', monitor['job_type'])
+        self.assertEqual(f'http://{value}:80/_ping', monitor['config']['url'])
+        self.assertEqual('send.me', monitor['config']['virtual_host'])
+        self.assertEqual(
+            f'host:unit.tests type:A value:{value}', monitor['notes']
+        )
+
+        record._octodns['healthcheck']['host'] = None
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(value, monitor['config']['virtual_host'])
+
+        record._octodns['healthcheck']['protocol'] = 'HTTPS'
+        monitor = provider._monitor_gen(record, value)
+        self.assertTrue(monitor['config']['url'].startswith('https://'))
+
+        # http version doesn't matter or fail
+        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
+        provider._monitor_gen(record, value)
+        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
+
+        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(1, monitor['config']['connect_timeout'])
+
+        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(2, monitor['config']['idle_timeout'])
+
+        record._octodns['healthcheck']['protocol'] = 'TCP'
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('tcp', monitor['job_type'])
+        # Nothing to send
+        self.assertFalse('send' in monitor['config'])
+        # Nothing to expect
+        self.assertFalse('rules' in monitor)
+
+        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(1000, monitor['config']['connect_timeout'])
+
+        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(2000, monitor['config']['response_timeout'])
+
+    def test_monitor_gen_AAAA_http(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
 
         value = '::ffff:3.4.5.6'
         record = self.aaaa_record()
@@ -1113,8 +1176,8 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertTrue(monitor['config']['ipv6'])
         self.assertTrue(f'[{value}]' in monitor['config']['url'])
 
-    def test_monitor_gen_CNAME(self):
-        provider = Ns1Provider('test', 'api-key')
+    def test_monitor_gen_CNAME_http(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
 
         value = 'iad.unit.tests.'
         record = self.cname_record()
