@@ -1536,6 +1536,8 @@ class Ns1Provider(BaseProvider):
                 # Already changed, or no dynamic , no need to check it
                 continue
 
+            touched = False
+
             # Filter normalization
             # Check if filters for existing domains need an update
             # Needs an explicit check since there might be no change in the
@@ -1552,27 +1554,47 @@ class Ns1Provider(BaseProvider):
                     domain,
                 )
                 extra.append(Update(record, record))
-                continue
+                touched = True
 
-            for value, have in self._monitors_for(record).items():
-                expected = self._monitor_gen(record, value)
-                # TODO: find values which have missing monitors
-                if not self._monitor_is_match(expected, have):
-                    self.log.info(
-                        '_extra_changes: monitor mis-match for %s',
-                        expected['name'],
-                    )
-                    extra.append(Update(record, record))
-                    break
-                if not have.get('notify_list'):
-                    self.log.info(
-                        '_extra_changes: broken monitor no notify '
-                        'list %s (%s)',
-                        have['name'],
-                        have['id'],
-                    )
-                    extra.append(Update(record, record))
-                    break
+            # check if any monitor needs to be synced
+            existing = self._monitors_for(record)
+            for pool in record.dynamic.pools.values():
+                for val in pool.data['values']:
+                    if val['status'] != 'obey':
+                        # no monitor necessary
+                        continue
+
+                    value = val['value']
+                    expected = self._monitor_gen(record, value)
+                    name = expected['name']
+
+                    have = existing.get(value)
+                    if not have:
+                        self.log.info(
+                            '_extra_changes: missing monitor %s', name
+                        )
+                        if not touched:
+                            extra.append(Update(record, record))
+                            touched = True
+                        continue
+
+                    if not self._monitor_is_match(expected, have):
+                        self.log.info(
+                            '_extra_changes: monitor mis-match for %s', name
+                        )
+                        if not touched:
+                            extra.append(Update(record, record))
+                            touched = True
+
+                    if not have.get('notify_list'):
+                        self.log.info(
+                            '_extra_changes: broken monitor no notify list %s (%s)',
+                            name,
+                            have['id'],
+                        )
+                        if not touched:
+                            extra.append(Update(record, record))
+                            touched = True
 
         return extra
 

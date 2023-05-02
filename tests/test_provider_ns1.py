@@ -2288,13 +2288,11 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
-
-        # Add notify_list back and change the healthcheck protocol, we'll still
-        # expect to see an update
-        reset()
         gend['notify_list'] = 'xyz'
+
+        # Change the healthcheck protocol and we'll expect to see an update
+        reset()
         dynamic._octodns['healthcheck']['protocol'] = 'HTTPS'
-        del gend['notify_list']
         monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
         extra = provider._extra_changes(desired, [])
         self.assertEqual(1, len(extra))
@@ -2302,6 +2300,7 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTP'
 
         # If it's in the changed list, it'll be ignored
         reset()
@@ -2309,7 +2308,23 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertFalse(extra)
         monitors_for_mock.assert_not_called()
 
+        # Missing monitor
+        reset()
+        monitors_for_mock.side_effect = [{}]
+        extra = provider._extra_changes(desired, [])
+        self.assertTrue(extra)
+
+        # Missing monitor for non-obey shouldn't trigger update
+        reset()
+        dynamic.dynamic.pools['iad'].data['values'][0]['status'] = 'up'
+        monitors_for_mock.side_effect = [{}]
+        extra = provider._extra_changes(desired, [])
+        self.assertFalse(extra)
+        dynamic.dynamic.pools['iad'].data['values'][0]['status'] = 'obey'
+
         # Test changes in filters
+        # skip monitor checks for filter tests
+        dynamic.dynamic.pools['iad'].data['values'][0]['status'] = 'up'
 
         # No change in filters
         reset()
@@ -2379,8 +2394,39 @@ class TestNs1ProviderDynamic(TestCase):
 
         # disabled=True in filters does trigger an update
         ns1_zone['records'][0]['filters'][0]['disabled'] = True
+        monitors_for_mock.side_effect = [{}]
         extra = provider._extra_changes(desired, [])
         self.assertTrue(extra)
+        ns1_zone['records'][0]['filters'][0]['disabled'] = False
+
+        # invalid filters and missing monitor doesn't produce duplicate changes
+        reset()
+        ns1_zone['records'][0]['filters'][0]['disabled'] = True
+        dynamic.dynamic.pools['iad'].data['values'][0]['status'] = 'obey'
+        monitors_for_mock.side_effect = [{}]
+        extra = provider._extra_changes(desired, [])
+        self.assertEqual(1, len(extra))
+        ns1_zone['records'][0]['filters'][0]['disabled'] = False
+
+        # invalid filters and out-of-sync monitor doesn't produce duplicate changes
+        reset()
+        ns1_zone['records'][0]['filters'][0]['disabled'] = True
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTPS'
+        monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
+        extra = provider._extra_changes(desired, [])
+        self.assertEqual(1, len(extra))
+        ns1_zone['records'][0]['filters'][0]['disabled'] = False
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTP'
+
+        # out-of-sync monitor and without notify_list doesn't produce duplicate changes
+        reset()
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTPS'
+        del gend['notify_list']
+        monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
+        extra = provider._extra_changes(desired, [])
+        self.assertEqual(1, len(extra))
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTP'
+        gend['notify_list'] = 'xyz'
 
     DESIRED = Zone('unit.tests.', [])
 
