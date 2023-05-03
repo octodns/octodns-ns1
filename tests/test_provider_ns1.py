@@ -2305,9 +2305,9 @@ class TestNs1ProviderDynamic(TestCase):
 
         # If it's in the changed list, it'll be ignored
         reset()
+        monitors_for_mock.side_effect = [{}]
         extra = provider._extra_changes(desired, [update])
         self.assertFalse(extra)
-        monitors_for_mock.assert_not_called()
 
         # Missing monitor should trigger an update
         reset()

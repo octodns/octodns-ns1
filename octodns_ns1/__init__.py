@@ -1532,7 +1532,7 @@ class Ns1Provider(BaseProvider):
         changed = set([c.record for c in changes])
         extra = []
         for record in desired.records:
-            if record in changed or not getattr(record, 'dynamic', False):
+            if not getattr(record, 'dynamic', False):
                 # Already changed, or no dynamic , no need to check it
                 continue
 
@@ -1589,7 +1589,7 @@ class Ns1Provider(BaseProvider):
                         )
                         update = True
 
-            if update:
+            if update and record not in changed:
                 extra.append(Update(record, record))
 
         return extra
