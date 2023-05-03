@@ -1536,7 +1536,7 @@ class Ns1Provider(BaseProvider):
                 # Already changed, or no dynamic , no need to check it
                 continue
 
-            touched = False
+            update = False
 
             # Filter normalization
             # Check if filters for existing domains need an update
@@ -1553,8 +1553,7 @@ class Ns1Provider(BaseProvider):
                     'will update record',
                     domain,
                 )
-                extra.append(Update(record, record))
-                touched = True
+                update = True
 
             # check if any monitor needs to be synced
             existing = self._monitors_for(record)
@@ -1573,18 +1572,14 @@ class Ns1Provider(BaseProvider):
                         self.log.info(
                             '_extra_changes: missing monitor %s', name
                         )
-                        if not touched:
-                            extra.append(Update(record, record))
-                            touched = True
+                        update = True
                         continue
 
                     if not self._monitor_is_match(expected, have):
                         self.log.info(
                             '_extra_changes: monitor mis-match for %s', name
                         )
-                        if not touched:
-                            extra.append(Update(record, record))
-                            touched = True
+                        update = True
 
                     if not have.get('notify_list'):
                         self.log.info(
@@ -1592,9 +1587,10 @@ class Ns1Provider(BaseProvider):
                             name,
                             have['id'],
                         )
-                        if not touched:
-                            extra.append(Update(record, record))
-                            touched = True
+                        update = True
+
+            if update:
+                extra.append(Update(record, record))
 
         return extra
 
