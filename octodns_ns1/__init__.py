@@ -1582,9 +1582,11 @@ class Ns1Provider(BaseProvider):
         changed = set([c.record for c in changes])
         extra = []
         for record in desired.records:
-            if record in changed or not getattr(record, 'dynamic', False):
-                # Already changed, or no dynamic , no need to check it
+            if not getattr(record, 'dynamic', False):
+                # no need to check non-dynamic simple records
                 continue
+
+            update = False
 
             # Filter normalization
             # Check if filters for existing domains need an update
@@ -1601,28 +1603,44 @@ class Ns1Provider(BaseProvider):
                     'will update record',
                     domain,
                 )
-                extra.append(Update(record, record))
-                continue
+                update = True
 
-            for value, have in self._monitors_for(record).items():
-                expected = self._monitor_gen(record, value)
-                # TODO: find values which have missing monitors
-                if not self._monitor_is_match(expected, have):
-                    self.log.info(
-                        '_extra_changes: monitor mis-match for %s',
-                        expected['name'],
-                    )
-                    extra.append(Update(record, record))
-                    break
-                if not have.get('notify_list'):
-                    self.log.info(
-                        '_extra_changes: broken monitor no notify '
-                        'list %s (%s)',
-                        have['name'],
-                        have['id'],
-                    )
-                    extra.append(Update(record, record))
-                    break
+            # check if any monitor needs to be synced
+            existing = self._monitors_for(record)
+            for pool in record.dynamic.pools.values():
+                for val in pool.data['values']:
+                    if val['status'] != 'obey':
+                        # no monitor necessary
+                        continue
+
+                    value = val['value']
+                    expected = self._monitor_gen(record, value)
+                    name = expected['name']
+
+                    have = existing.get(value)
+                    if not have:
+                        self.log.info(
+                            '_extra_changes: missing monitor %s', name
+                        )
+                        update = True
+                        continue
+
+                    if not self._monitor_is_match(expected, have):
+                        self.log.info(
+                            '_extra_changes: monitor mis-match for %s', name
+                        )
+                        update = True
+
+                    if not have.get('notify_list'):
+                        self.log.info(
+                            '_extra_changes: broken monitor no notify list %s (%s)',
+                            name,
+                            have['id'],
+                        )
+                        update = True
+
+            if update and record not in changed:
+                extra.append(Update(record, record))
 
         return extra
 
