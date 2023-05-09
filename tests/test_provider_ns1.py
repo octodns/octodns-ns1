@@ -2305,9 +2305,22 @@ class TestNs1ProviderDynamic(TestCase):
 
         # If it's in the changed list, it'll be ignored
         reset()
+        monitors_for_mock.side_effect = [{}]
         extra = provider._extra_changes(desired, [update])
         self.assertFalse(extra)
-        monitors_for_mock.assert_not_called()
+
+        # Missing monitor should trigger an update
+        reset()
+        monitors_for_mock.side_effect = [{}]
+        extra = provider._extra_changes(desired, [])
+        self.assertTrue(extra)
+
+        # Missing monitor for non-obey shouldn't trigger update
+        reset()
+        dynamic.dynamic.pools['iad'].data['values'][0]['status'] = 'up'
+        monitors_for_mock.side_effect = [{}]
+        extra = provider._extra_changes(desired, [])
+        self.assertFalse(extra)
 
         # Test changes in filters
 
@@ -2379,6 +2392,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         # disabled=True in filters does trigger an update
         ns1_zone['records'][0]['filters'][0]['disabled'] = True
+        monitors_for_mock.side_effect = [{}]
         extra = provider._extra_changes(desired, [])
         self.assertTrue(extra)
 
