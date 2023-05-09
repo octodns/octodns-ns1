@@ -1619,16 +1619,34 @@ class Ns1Provider(BaseProvider):
 
                     have = existing.get(value)
                     if not have:
-                        self.log.info(
-                            '_extra_changes: missing monitor %s', name
-                        )
+                        if self.use_http_monitors:
+                            self.log.warning(
+                                '_extra_changes: missing monitor %s will be created of type http, '
+                                'this will not be forward-compatible and octodns-ns1 cannot be downgraded',
+                                name,
+                            )
+                        else:
+                            self.log.info(
+                                '_extra_changes: missing monitor %s', name
+                            )
                         update = True
                         continue
 
                     if not self._monitor_is_match(expected, have):
-                        self.log.info(
-                            '_extra_changes: monitor mis-match for %s', name
-                        )
+                        if expected['job_type'] != have['job_type']:
+                            self.log.warning(
+                                '_extra_changes: existing %s monitor %s will be deleted and replaced by a new %s monitor, '
+                                '%s will be temporarily treated as being healthy as a result '
+                                'and this is operation will be irreversible and not forward-compatible',
+                                have['job_type'],
+                                name,
+                                expected['job_type'],
+                                value,
+                            )
+                        else:
+                            self.log.info(
+                                '_extra_changes: monitor mis-match for %s', name
+                            )
                         update = True
 
                     if not have.get('notify_list'):

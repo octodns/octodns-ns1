@@ -2371,13 +2371,12 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
+        gend['notify_list'] = 'xyz'
 
-        # Add notify_list back and change the healthcheck protocol, we'll still
+        # change the healthcheck protocol, we'll still
         # expect to see an update
         reset()
-        gend['notify_list'] = 'xyz'
         dynamic._octodns['healthcheck']['protocol'] = 'HTTPS'
-        del gend['notify_list']
         monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
         extra = provider._extra_changes(desired, [])
         self.assertEqual(1, len(extra))
@@ -2385,6 +2384,19 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTP'
+
+        # Expect to see an update from TCP to HTTP monitor/job_type
+        ## no change if use_http_monitors=False (default)
+        monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
+        extra = provider._extra_changes(desired, [])
+        self.assertFalse(extra)
+        ## change triggered if use_http_monitors=True
+        monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
+        provider.use_http_monitors = True
+        extra = provider._extra_changes(desired, [])
+        self.assertTrue(extra)
+        provider.use_http_monitors = False
 
         # If it's in the changed list, it'll be ignored
         reset()
@@ -2395,8 +2407,10 @@ class TestNs1ProviderDynamic(TestCase):
         # Missing monitor should trigger an update
         reset()
         monitors_for_mock.side_effect = [{}]
+        provider.use_http_monitors = True
         extra = provider._extra_changes(desired, [])
         self.assertTrue(extra)
+        provider.use_http_monitors = False
 
         # Missing monitor for non-obey shouldn't trigger update
         reset()
