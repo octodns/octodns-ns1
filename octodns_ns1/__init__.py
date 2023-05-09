@@ -1533,7 +1533,7 @@ class Ns1Provider(BaseProvider):
         extra = []
         for record in desired.records:
             if not getattr(record, 'dynamic', False):
-                # Already changed, or no dynamic , no need to check it
+                # no need to check non-dynamic simple records
                 continue
 
             update = False
