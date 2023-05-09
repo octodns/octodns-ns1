@@ -430,8 +430,8 @@ class Ns1Provider(BaseProvider):
         self.log = getLogger(f'Ns1Provider[{id}]')
         self.log.debug(
             '__init__: id=%s, api_key=***, retry_count=%d, '
-            'monitor_regions=%s, parallelism=%s, client_config=%s',
-            'shared_notifylist=%s, use_http_monitors=%s',
+            'monitor_regions=%s, parallelism=%s, client_config=%s, '
+            'shared_notifylist=%s, use_http_monitors=%s, '
             'default_healthcheck_http_version=%s',
             id,
             retry_count,
