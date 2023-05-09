@@ -1633,7 +1633,13 @@ class Ns1Provider(BaseProvider):
                         continue
 
                     if not self._monitor_is_match(expected, have):
-                        if expected['job_type'] != have['job_type']:
+                        if expected['job_type'] == have['job_type']:
+                            self.log.info(
+                                '_extra_changes: monitor mis-match for %s', name
+                            )
+                        else:
+                            # NS1 monitor job types cannot be changed, so we need to do
+                            # delete+create, which has a few implications:
                             self.log.warning(
                                 '_extra_changes: existing %s monitor %s will be deleted and replaced by a new %s monitor, '
                                 '%s will be temporarily treated as being healthy as a result '
@@ -1642,10 +1648,6 @@ class Ns1Provider(BaseProvider):
                                 name,
                                 expected['job_type'],
                                 value,
-                            )
-                        else:
-                            self.log.info(
-                                '_extra_changes: monitor mis-match for %s', name
                             )
                         update = True
 
