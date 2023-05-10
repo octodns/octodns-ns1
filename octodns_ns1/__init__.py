@@ -1622,7 +1622,7 @@ class Ns1Provider(BaseProvider):
                         if self.use_http_monitors:
                             self.log.warning(
                                 '_extra_changes: missing monitor %s will be created of type http, '
-                                'this will not be forward-compatible and octodns-ns1 cannot be downgraded',
+                                'octodns-ns1 cannot be downgraded below v0.0.5 after applying this change',
                                 name,
                             )
                         else:
@@ -1642,8 +1642,9 @@ class Ns1Provider(BaseProvider):
                             # delete+create, which has a few implications:
                             self.log.warning(
                                 '_extra_changes: existing %s monitor %s will be deleted and replaced by a new %s monitor, '
-                                '%s will be temporarily treated as being healthy as a result '
-                                'and this is operation will be irreversible and not forward-compatible',
+                                '%s will be temporarily treated as being healthy as a result, '
+                                'this is operation will be irreversible and not forward-compatible, ie '
+                                'octodns-ns1 cannot be downgraded below v0.0.5 after applying this change',
                                 have['job_type'],
                                 name,
                                 expected['job_type'],
