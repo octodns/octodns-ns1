@@ -1199,7 +1199,7 @@ class Ns1Provider(BaseProvider):
                 have_config = have.get(k, {})
                 for k, v in v.items():
                     if have_config.get(k, '--missing--') != v:
-                        self.log.info(
+                        self.log.debug(
                             f'{log_prefix}: got config.{k}={have_config.get(k)}, expected {v}'
                         )
                         return False
@@ -1621,7 +1621,7 @@ class Ns1Provider(BaseProvider):
                     if not have:
                         if self.use_http_monitors:
                             self.log.warning(
-                                '_extra_changes: missing monitor %s will be created of type http, '
+                                '_extra_changes: missing monitor "%s" will be created of type http, '
                                 'octodns-ns1 cannot be downgraded below v0.0.5 after applying this change',
                                 name,
                             )
@@ -1641,8 +1641,8 @@ class Ns1Provider(BaseProvider):
                             # NS1 monitor job types cannot be changed, so we need to do
                             # delete+create, which has a few implications:
                             self.log.warning(
-                                '_extra_changes: existing %s monitor %s will be deleted and replaced by a new %s monitor, '
-                                '%s will be temporarily treated as being healthy as a result, '
+                                '_extra_changes: existing %s monitor "%s" will be deleted and replaced by a new %s monitor, '
+                                '`%s` will be temporarily treated as being healthy as a result, '
                                 'this is operation will be irreversible and not forward-compatible, ie '
                                 'octodns-ns1 cannot be downgraded below v0.0.5 after applying this change',
                                 have['job_type'],
