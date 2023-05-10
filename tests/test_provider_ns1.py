@@ -899,6 +899,10 @@ class TestNs1ProviderDynamic(TestCase):
             'config': {'host': 'iad.unit.tests'},
             'notes': 'host:foo.unit.tests type:CNAME',
         }
+        monitor_eight = {
+            'config': {'url': 'https://iad.unit.tests/_ping'},
+            'notes': 'host:foo.unit.tests type:CNAME value:iad.unit.tests',
+        }
         provider._client._monitors_cache = {
             'one': monitor_one,
             'two': {
@@ -935,6 +939,13 @@ class TestNs1ProviderDynamic(TestCase):
         # Check match for CNAME values
         self.assertEqual(
             {'iad.unit.tests.': monitor_five},
+            provider._monitors_for(self.cname_record()),
+        )
+
+        # Check for HTTP monitors match from notes
+        provider._client._monitors_cache['eight'] = monitor_eight
+        self.assertEqual(
+            {'iad.unit.tests.': monitor_eight},
             provider._monitors_for(self.cname_record()),
         )
 
@@ -1055,6 +1066,7 @@ class TestNs1ProviderDynamic(TestCase):
         value = '3.4.5.6'
         record = self.record()
         monitor = provider._monitor_gen(record, value)
+        self.assertEqual('tcp', monitor['job_type'])
         self.assertEqual(value, monitor['config']['host'])
         self.assertTrue('\\nHost: send.me\\r' in monitor['config']['send'])
         self.assertFalse(monitor['config']['ssl'])
@@ -1064,12 +1076,22 @@ class TestNs1ProviderDynamic(TestCase):
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(r'\nHost: 3.4.5.6\r' in monitor['config']['send'])
 
+        # Test http version validation
+        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
+        with self.assertRaisesRegex(
+            Ns1Exception,
+            r"unsupported http version found: 'invalid'. Expected version in \('HTTP/1.0', 'HTTP/1.1'\)",
+        ):
+            provider._monitor_gen(record, value)
+        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
+
         record._octodns['healthcheck']['protocol'] = 'HTTPS'
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(monitor['config']['ssl'])
 
         record._octodns['healthcheck']['protocol'] = 'TCP'
         monitor = provider._monitor_gen(record, value)
+        self.assertEqual('tcp', monitor['job_type'])
         # No http send done
         self.assertFalse('send' in monitor['config'])
         # No http response expected
@@ -1095,30 +1117,72 @@ class TestNs1ProviderDynamic(TestCase):
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2000, monitor['config']['response_timeout'])
 
-        # Test http version validation
+    def test_monitor_gen_http(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
+
+        value = '3.4.5.6'
+        record = self.record()
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('http', monitor['job_type'])
+        self.assertEqual(f'http://{value}:80/_ping', monitor['config']['url'])
+        self.assertEqual('send.me', monitor['config']['virtual_host'])
+        self.assertEqual(
+            f'host:unit.tests type:A value:{value}', monitor['notes']
+        )
+
+        record._octodns['healthcheck']['host'] = None
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(value, monitor['config']['virtual_host'])
+
+        record._octodns['healthcheck']['protocol'] = 'HTTPS'
+        monitor = provider._monitor_gen(record, value)
+        self.assertTrue(monitor['config']['url'].startswith('https://'))
+
+        # http version doesn't matter or fail
         record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
-        with self.assertRaisesRegex(
-            Ns1Exception,
-            r"unsupported http version found: 'invalid'. Expected version in \('HTTP/1.0', 'HTTP/1.1'\)",
-        ):
-            provider._healthcheck_http_version(record)
+        provider._monitor_gen(record, value)
         record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
 
-    def test_monitor_gen_AAAA(self):
-        provider = Ns1Provider('test', 'api-key')
+        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(1, monitor['config']['connect_timeout'])
+
+        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(2, monitor['config']['idle_timeout'])
+
+        record._octodns['healthcheck']['protocol'] = 'TCP'
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('tcp', monitor['job_type'])
+        # Nothing to send
+        self.assertFalse('send' in monitor['config'])
+        # Nothing to expect
+        self.assertFalse('rules' in monitor)
+
+        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(1000, monitor['config']['connect_timeout'])
+
+        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual(2000, monitor['config']['response_timeout'])
+
+    def test_monitor_gen_AAAA_http(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
 
         value = '::ffff:3.4.5.6'
         record = self.aaaa_record()
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(monitor['config']['ipv6'])
+        self.assertTrue(f'[{value}]' in monitor['config']['url'])
 
-    def test_monitor_gen_CNAME(self):
-        provider = Ns1Provider('test', 'api-key')
+    def test_monitor_gen_CNAME_http(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
 
         value = 'iad.unit.tests.'
         record = self.cname_record()
         monitor = provider._monitor_gen(record, value)
-        self.assertEqual(value[:-1], monitor['config']['host'])
+        self.assertTrue(value[:-1] in monitor['config']['url'])
 
     def test_monitor_is_match(self):
         provider = Ns1Provider('test', 'api-key')
@@ -1173,6 +1237,7 @@ class TestNs1ProviderDynamic(TestCase):
         )
 
     @patch('octodns_ns1.Ns1Provider._feed_create')
+    @patch('octodns_ns1.Ns1Provider._monitor_delete')
     @patch('octodns_ns1.Ns1Client.monitors_update')
     @patch('octodns_ns1.Ns1Provider._monitor_create')
     @patch('octodns_ns1.Ns1Provider._monitor_gen')
@@ -1181,6 +1246,7 @@ class TestNs1ProviderDynamic(TestCase):
         monitor_gen_mock,
         monitor_create_mock,
         monitors_update_mock,
+        monitor_delete_mock,
         feed_create_mock,
     ):
         provider = Ns1Provider('test', 'api-key')
@@ -1235,17 +1301,34 @@ class TestNs1ProviderDynamic(TestCase):
         monitors_update_mock.assert_not_called()
         feed_create_mock.assert_has_calls([call(monitor)])
 
-        # Existing monitor that needs updates
+        # Existing monitor of same job_type that needs updates
         reset()
-        monitor = {'id': 'mon-id', 'key': 'value', 'name': 'monitor name'}
-        gened = {'other': 'thing'}
+        monitor = {'id': 'mon-id', 'job_type': 'value', 'name': 'monitor name'}
+        gened = {'other': 'thing', 'job_type': 'value'}
         monitor_gen_mock.side_effect = [gened]
         monitor_id, feed_id = provider._monitor_sync(record, value, monitor)
         self.assertEqual('mon-id', monitor_id)
         self.assertEqual('feed-id', feed_id)
         monitor_gen_mock.assert_called_once()
         monitor_create_mock.assert_not_called()
-        monitors_update_mock.assert_has_calls([call('mon-id', other='thing')])
+        monitors_update_mock.assert_has_calls(
+            [call('mon-id', other='thing', job_type='value')]
+        )
+        feed_create_mock.assert_not_called()
+
+        # Existing monitor of different job_type that needs updates
+        reset()
+        monitor = {'id': 'mon-id', 'job_type': 'value', 'name': 'monitor name'}
+        gened = {'other': 'thing', 'job_type': 'value2'}
+        monitor_gen_mock.side_effect = [gened]
+        monitor_create_mock.side_effect = [('mon-id3', 'feed-id3')]
+        monitor_id, feed_id = provider._monitor_sync(record, value, monitor)
+        self.assertEqual('mon-id3', monitor_id)
+        self.assertEqual('feed-id3', feed_id)
+        monitor_gen_mock.assert_called_once()
+        monitor_delete_mock.assert_has_calls([call(monitor)])
+        monitor_create_mock.assert_has_calls([call(gened)])
+        monitors_update_mock.assert_not_called()
         feed_create_mock.assert_not_called()
 
     @patch('octodns_ns1.Ns1Client.notifylists_delete')
@@ -2288,13 +2371,12 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
+        gend['notify_list'] = 'xyz'
 
-        # Add notify_list back and change the healthcheck protocol, we'll still
+        # change the healthcheck protocol, we'll still
         # expect to see an update
         reset()
-        gend['notify_list'] = 'xyz'
         dynamic._octodns['healthcheck']['protocol'] = 'HTTPS'
-        del gend['notify_list']
         monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
         extra = provider._extra_changes(desired, [])
         self.assertEqual(1, len(extra))
@@ -2302,6 +2384,19 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
+        dynamic._octodns['healthcheck']['protocol'] = 'HTTP'
+
+        # Expect to see an update from TCP to HTTP monitor/job_type
+        ## no change if use_http_monitors=False (default)
+        monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
+        extra = provider._extra_changes(desired, [])
+        self.assertFalse(extra)
+        ## change triggered if use_http_monitors=True
+        monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
+        provider.use_http_monitors = True
+        extra = provider._extra_changes(desired, [])
+        self.assertTrue(extra)
+        provider.use_http_monitors = False
 
         # If it's in the changed list, it'll be ignored
         reset()
@@ -2312,8 +2407,10 @@ class TestNs1ProviderDynamic(TestCase):
         # Missing monitor should trigger an update
         reset()
         monitors_for_mock.side_effect = [{}]
+        provider.use_http_monitors = True
         extra = provider._extra_changes(desired, [])
         self.assertTrue(extra)
+        provider.use_http_monitors = False
 
         # Missing monitor for non-obey shouldn't trigger update
         reset()

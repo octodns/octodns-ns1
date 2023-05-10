@@ -422,6 +422,7 @@ class Ns1Provider(BaseProvider):
         parallelism=None,
         client_config=None,
         shared_notifylist=False,
+        use_http_monitors=False,
         default_healthcheck_http_version="HTTP/1.0",
         *args,
         **kwargs,
@@ -429,16 +430,22 @@ class Ns1Provider(BaseProvider):
         self.log = getLogger(f'Ns1Provider[{id}]')
         self.log.debug(
             '__init__: id=%s, api_key=***, retry_count=%d, '
-            'monitor_regions=%s, parallelism=%s, client_config=%s',
+            'monitor_regions=%s, parallelism=%s, client_config=%s, '
+            'shared_notifylist=%s, use_http_monitors=%s, '
+            'default_healthcheck_http_version=%s',
             id,
             retry_count,
             monitor_regions,
             parallelism,
             client_config,
+            shared_notifylist,
+            use_http_monitors,
+            default_healthcheck_http_version,
         )
         super().__init__(id, *args, **kwargs)
         self.monitor_regions = monitor_regions
         self.shared_notifylist = shared_notifylist
+        self.use_http_monitors = use_http_monitors
         self.record_filters = dict()
         self._client = Ns1Client(
             api_key, parallelism, retry_count, client_config
@@ -959,9 +966,11 @@ class Ns1Provider(BaseProvider):
                     expected_host == data['host']
                     and expected_type == data['type']
                 ):
-                    # This monitor does not belong to this record
-                    config = monitor['config']
-                    value = config['host']
+                    # This monitor belongs to this record
+                    value = data.get('value')
+                    if not value:
+                        # old style notes in TCP monitors
+                        value = monitor['config']['host']
                     if record._type == 'CNAME':
                         # Append a trailing dot for CNAME records so that
                         # lookup by a CNAME answer works
@@ -1030,6 +1039,23 @@ class Ns1Provider(BaseProvider):
 
         return monitor_id, self._feed_create(monitor)
 
+    def _monitor_delete(self, monitor):
+        monitor_id = monitor['id']
+        feed_id = self._client.feeds_for_monitors.get(monitor_id)
+        if feed_id:
+            self._client.datafeed_delete(self._client.datasource_id, feed_id)
+
+        self._client.monitors_delete(monitor_id)
+
+        notify_list_id = monitor['notify_list']
+        for nl_name, nl in self._client.notifylists.items():
+            if nl['id'] == notify_list_id:
+                # We've found the that might need deleting
+                if nl['name'] != self.SHARED_NOTIFYLIST_NAME:
+                    # It's not shared so is safe to delete
+                    self._client.notifylists_delete(notify_list_id)
+                break
+
     def _healthcheck_policy(self, record):
         return (
             record._octodns.get('ns1', {})
@@ -1088,22 +1114,8 @@ class Ns1Provider(BaseProvider):
 
         ret = {
             'active': True,
-            'config': {
-                'connect_timeout':
-                # TCP monitors use milliseconds, so convert from
-                # seconds to milliseconds
-                self._healthcheck_connect_timeout(record) * 1000,
-                'host': value,
-                'port': record.healthcheck_port,
-                'response_timeout':
-                # TCP monitors use milliseconds, so convert from
-                # seconds to milliseconds
-                self._healthcheck_response_timeout(record) * 1000,
-                'ssl': record.healthcheck_protocol == 'HTTPS',
-            },
-            'job_type': 'tcp',
             'name': f'{host} - {_type} - {value}',
-            'notes': self._encode_notes({'host': host, 'type': _type}),
+            'notes': {'host': host, 'type': _type},
             'policy': self._healthcheck_policy(record),
             'frequency': self._healthcheck_frequency(record),
             'rapid_recheck': self._healthcheck_rapid_recheck(record),
@@ -1111,23 +1123,65 @@ class Ns1Provider(BaseProvider):
             'regions': self.monitor_regions,
         }
 
+        connect_timeout = self._healthcheck_connect_timeout(record)
+        response_timeout = self._healthcheck_response_timeout(record)
+
+        if record.healthcheck_protocol == 'TCP' or not self.use_http_monitors:
+            ret['job_type'] = 'tcp'
+            ret['config'] = {
+                'host': value,
+                'port': record.healthcheck_port,
+                # TCP monitors use milliseconds, so convert from seconds to milliseconds
+                'connect_timeout': connect_timeout * 1000,
+                'response_timeout': response_timeout * 1000,
+                'ssl': record.healthcheck_protocol == 'HTTPS',
+            }
+
+            if record.healthcheck_protocol != 'TCP':
+                # legacy HTTP-emulating TCP monitor
+                # we need to send the HTTP request string
+                path = record.healthcheck_path
+                host = record.healthcheck_host(value=value)
+                http_version = self._healthcheck_http_version(record)
+                request = (
+                    fr'GET {path} {http_version}\r\nHost: {host}\r\n'
+                    r'User-agent: NS1\r\n\r\n'
+                )
+                ret['config']['send'] = request
+                # We'll also expect a HTTP response
+                ret['rules'] = [
+                    {
+                        'comparison': 'contains',
+                        'key': 'output',
+                        'value': '200 OK',
+                    }
+                ]
+        else:
+            # modern HTTP monitor
+            ret['job_type'] = 'http'
+            proto = record.healthcheck_protocol.lower()
+            domain = f'[{value}]' if _type == 'AAAA' else value
+            port = record.healthcheck_port
+            path = record.healthcheck_path
+            ret['config'] = {
+                'url': f'{proto}://{domain}:{port}{path}',
+                'virtual_host': record.healthcheck_host(value=value),
+                'user_agent': 'NS1',
+                'tls_add_verify': False,
+                'follow_redirect': False,
+                'connect_timeout': connect_timeout,
+                'idle_timeout': response_timeout,
+            }
+            ret['rules'] = [
+                {'comparison': '==', 'key': 'status_code', 'value': '200'}
+            ]
+
         if _type == 'AAAA':
             ret['config']['ipv6'] = True
 
-        if record.healthcheck_protocol != 'TCP':
-            # IF it's HTTP we need to send the request string
-            path = record.healthcheck_path
-            host = record.healthcheck_host(value=value)
-            http_version = self._healthcheck_http_version(record)
-            request = (
-                fr'GET {path} {http_version}\r\nHost: {host}\r\n'
-                r'User-agent: NS1\r\n\r\n'
-            )
-            ret['config']['send'] = request
-            # We'll also expect a HTTP response
-            ret['rules'] = [
-                {'comparison': 'contains', 'key': 'output', 'value': '200 OK'}
-            ]
+        if self.use_http_monitors:
+            ret['notes']['value'] = value
+        ret['notes'] = self._encode_notes(ret['notes'])
 
         return ret
 
@@ -1145,7 +1199,7 @@ class Ns1Provider(BaseProvider):
                 have_config = have.get(k, {})
                 for k, v in v.items():
                     if have_config.get(k, '--missing--') != v:
-                        self.log.info(
+                        self.log.debug(
                             f'{log_prefix}: got config.{k}={have_config.get(k)}, expected {v}'
                         )
                         return False
@@ -1171,21 +1225,32 @@ class Ns1Provider(BaseProvider):
         if existing:
             self.log.debug('_monitor_sync:   existing=%s', existing['id'])
             monitor_id = existing['id']
+            feed_id = None
 
             if not self._monitor_is_match(expected, existing):
-                self.log.debug('_monitor_sync:   existing needs update')
-                # Update the monitor to match expected, everything else will be
-                # left alone and assumed correct
-                self._client.monitors_update(monitor_id, **expected)
+                if expected['job_type'] == existing['job_type']:
+                    self.log.debug('_monitor_sync:   existing needs update')
+                    # Update the monitor to match expected, everything else will be
+                    # left alone and assumed correct
+                    self._client.monitors_update(monitor_id, **expected)
+                else:
+                    # NS1 monitor job types cannot be changed, so we will do a
+                    # delete+create
+                    self.log.debug(
+                        '_monitor_sync: existing needs to be replaced (delete+create new)'
+                    )
+                    self._monitor_delete(existing)
+                    monitor_id, feed_id = self._monitor_create(expected)
 
-            feed_id = self._client.feeds_for_monitors.get(monitor_id)
-            if feed_id is None:
-                self.log.warning(
-                    '_monitor_sync: %s (%s) missing feed, creating',
-                    existing['name'],
-                    monitor_id,
-                )
-                feed_id = self._feed_create(existing)
+            if not feed_id:
+                feed_id = self._client.feeds_for_monitors.get(monitor_id)
+                if feed_id is None:
+                    self.log.warning(
+                        '_monitor_sync: %s (%s) missing feed, creating',
+                        existing['name'],
+                        monitor_id,
+                    )
+                    feed_id = self._feed_create(existing)
         else:
             self.log.debug('_monitor_sync:   needs create')
             # We don't have an existing monitor create it (and related bits)
@@ -1210,22 +1275,7 @@ class Ns1Provider(BaseProvider):
 
             self.log.debug('_monitors_gc:   deleting %s', monitor_id)
 
-            feed_id = self._client.feeds_for_monitors.get(monitor_id)
-            if feed_id:
-                self._client.datafeed_delete(
-                    self._client.datasource_id, feed_id
-                )
-
-            self._client.monitors_delete(monitor_id)
-
-            notify_list_id = monitor['notify_list']
-            for nl_name, nl in self._client.notifylists.items():
-                if nl['id'] == notify_list_id:
-                    # We've found the that might need deleting
-                    if nl['name'] != self.SHARED_NOTIFYLIST_NAME:
-                        # It's not shared so is safe to delete
-                        self._client.notifylists_delete(notify_list_id)
-                    break
+            self._monitor_delete(monitor)
 
     def _add_answers_for_pool(
         self,
@@ -1569,16 +1619,37 @@ class Ns1Provider(BaseProvider):
 
                     have = existing.get(value)
                     if not have:
-                        self.log.info(
-                            '_extra_changes: missing monitor %s', name
-                        )
+                        if self.use_http_monitors:
+                            self.log.warning(
+                                '_extra_changes: missing monitor "%s" will be created of type http, '
+                                'octodns-ns1 cannot be downgraded below v0.0.5 after applying this change',
+                                name,
+                            )
+                        else:
+                            self.log.info(
+                                '_extra_changes: missing monitor %s', name
+                            )
                         update = True
                         continue
 
                     if not self._monitor_is_match(expected, have):
-                        self.log.info(
-                            '_extra_changes: monitor mis-match for %s', name
-                        )
+                        if expected['job_type'] == have['job_type']:
+                            self.log.info(
+                                '_extra_changes: monitor mis-match for %s', name
+                            )
+                        else:
+                            # NS1 monitor job types cannot be changed, so we need to do
+                            # delete+create, which has a few implications:
+                            self.log.warning(
+                                '_extra_changes: existing %s monitor "%s" will be deleted and replaced by a new %s monitor, '
+                                '`%s` will be temporarily treated as being healthy as a result, '
+                                'this is operation will be irreversible and not forward-compatible, ie '
+                                'octodns-ns1 cannot be downgraded below v0.0.5 after applying this change',
+                                have['job_type'],
+                                name,
+                                expected['job_type'],
+                                value,
+                            )
                         update = True
 
                     if not have.get('notify_list'):
