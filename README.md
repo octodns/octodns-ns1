@@ -61,9 +61,14 @@ providers:
         endpoint: my.nsone.endpoint # Default: api.nsone.net
         ignore-ssl-errors: true     # Default: false
         follow_pagination: false    # Default: true
-    # Optional. Default: HTTP/1.0 . Default HTTP protocol to use when 
-    # health-checking dynamic record endpoints. See "Health Check Options" 
+    # Optional. Default: false. Use modern HTTP monitor (true) or the legacy
+    # HTTP-emulating TCP monitor (false) for HTTP(s) healthchecks.
+    use_http_monitors: false
+    # Optional. Default: HTTP/1.0. Default HTTP protocol to use when
+    # health-checking dynamic record endpoints. See "Health Check Options"
     # README section below to override per dynamic record.
+    # This is only supported when use_http_monitors is set to false. If it
+    # is set to true, HTTP/1.1 will be used and it cannot be changed.
     default_healthcheck_http_version: HTTP/1.0
 
 ```
@@ -97,7 +102,7 @@ See https://github.com/octodns/octodns/blob/master/docs/dynamic_records.md#healt
 | connect_timeout | Timeout (in seconds) before we give up trying to connect | 2 |
 | response_timeout | Timeout (in seconds) after connecting to wait for output | 10 |
 | rapid_recheck | Enable or disable a second, automatic verification test before changing the status of a host. Enabling this option can help prevent false positives. | False |
-| http_version | Specify HTTP version to use when HTTP health-checking  a host. One of <ol><li>`HTTP/1.0`</li><li>`HTTP/1.1`</li><ol> | `HTTP/1.0` |
+| http_version | Specify HTTP version to use when HTTP health-checking a host. Only applicable if `use_http_monitors=False`. One of <ol><li>`HTTP/1.0`</li><li>`HTTP/1.1`</li><ol> | `HTTP/1.0` |
 
 ```yaml
 ---
