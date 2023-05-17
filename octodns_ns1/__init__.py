@@ -285,6 +285,7 @@ class Ns1Provider(BaseProvider):
     SUPPORTS_GEO = True
     SUPPORTS_DYNAMIC = True
     SUPPORTS_POOL_VALUE_STATUS = True
+    SUPPORTS_DYNAMIC_SUBNETS = True
     SUPPORTS_MULTIVALUE_PTR = True
     SUPPORTS_ROOT_NS = True
     SUPPORTS = set(
@@ -324,6 +325,13 @@ class Ns1Provider(BaseProvider):
         return {
             'config': {'remove_no_location': True},
             'filter': u'geofence_country',
+        }
+
+    @property
+    def _SUBNET_FILTER(self):
+        return {
+            'config': {'remove_no_ip_prefixes': True},
+            'filter': u'netfence_prefix',
         }
 
     # In the NS1 UI/portal, this filter is called "SELECT FIRST GROUP" though
@@ -377,9 +385,57 @@ class Ns1Provider(BaseProvider):
         ]
 
     @property
+    def _FILTER_CHAIN_WITH_SUBNET(self):
+        return [
+            self._UP_FILTER,
+            self._SUBNET_FILTER,
+            self._SELECT_FIRST_REGION_FILTER,
+            self._PRIORITY_FILTER,
+            self._WEIGHTED_SHUFFLE_FILTER,
+            self._SELECT_FIRST_N_FILTER,
+        ]
+
+    @property
     def _FILTER_CHAIN_WITH_REGION_AND_COUNTRY(self):
         return [
             self._UP_FILTER,
+            self._COUNTRY_FILTER,
+            self._REGION_FILTER,
+            self._SELECT_FIRST_REGION_FILTER,
+            self._PRIORITY_FILTER,
+            self._WEIGHTED_SHUFFLE_FILTER,
+            self._SELECT_FIRST_N_FILTER,
+        ]
+
+    @property
+    def _FILTER_CHAIN_WITH_REGION_AND_SUBNET(self):
+        return [
+            self._UP_FILTER,
+            self._SUBNET_FILTER,
+            self._REGION_FILTER,
+            self._SELECT_FIRST_REGION_FILTER,
+            self._PRIORITY_FILTER,
+            self._WEIGHTED_SHUFFLE_FILTER,
+            self._SELECT_FIRST_N_FILTER,
+        ]
+
+    @property
+    def _FILTER_CHAIN_WITH_COUNTRY_AND_SUBNET(self):
+        return [
+            self._UP_FILTER,
+            self._SUBNET_FILTER,
+            self._COUNTRY_FILTER,
+            self._SELECT_FIRST_REGION_FILTER,
+            self._PRIORITY_FILTER,
+            self._WEIGHTED_SHUFFLE_FILTER,
+            self._SELECT_FIRST_N_FILTER,
+        ]
+
+    @property
+    def _FILTER_CHAIN_WITH_REGION_AND_COUNTRY_AND_SUBNET(self):
+        return [
+            self._UP_FILTER,
+            self._SUBNET_FILTER,
             self._COUNTRY_FILTER,
             self._REGION_FILTER,
             self._SELECT_FIRST_REGION_FILTER,
@@ -463,18 +519,27 @@ class Ns1Provider(BaseProvider):
         self._sanitize_disabled_in_filter_config(filter_cfg)
         has_region = self._REGION_FILTER in filter_cfg
         has_country = self._COUNTRY_FILTER in filter_cfg
+        has_subnet = self._SUBNET_FILTER in filter_cfg
         expected_filter_cfg = self._get_updated_filter_chain(
-            has_region, has_country
+            has_region, has_country, has_subnet
         )
         return filter_cfg == expected_filter_cfg
 
-    def _get_updated_filter_chain(self, has_region, has_country):
-        if has_region and has_country:
+    def _get_updated_filter_chain(self, has_region, has_country, has_subnet):
+        if has_region and has_country and has_subnet:
+            filter_chain = self._FILTER_CHAIN_WITH_REGION_AND_COUNTRY_AND_SUBNET
+        elif has_region and has_country:
             filter_chain = self._FILTER_CHAIN_WITH_REGION_AND_COUNTRY
+        elif has_region and has_subnet:
+            filter_chain = self._FILTER_CHAIN_WITH_REGION_AND_SUBNET
+        elif has_country and has_subnet:
+            filter_chain = self._FILTER_CHAIN_WITH_COUNTRY_AND_SUBNET
         elif has_region:
             filter_chain = self._FILTER_CHAIN_WITH_REGION
         elif has_country:
             filter_chain = self._FILTER_CHAIN_WITH_COUNTRY
+        elif has_subnet:
+            filter_chain = self._FILTER_CHAIN_WITH_SUBNET
         else:
             filter_chain = self._BASIC_FILTER_CHAIN
 
@@ -537,9 +602,10 @@ class Ns1Provider(BaseProvider):
         return data
 
     def _parse_dynamic_pool_name(self, pool_name):
-        if pool_name.startswith('catchall__'):
+        catchall_prefix = 'catchall__'
+        if pool_name.startswith(catchall_prefix):
             # Special case for the old-style catchall prefix
-            return pool_name[10:]
+            return pool_name[len(catchall_prefix) :]
         try:
             pool_name, _ = pool_name.rsplit('__', 1)
         except ValueError:
@@ -694,6 +760,9 @@ class Ns1Provider(BaseProvider):
                 # There are geos, combine them with any existing geos for this
                 # pool and recorded the sorted unique set of them
                 rule['geos'] = sorted(set(rule.get('geos', [])) | geos)
+            subnets = set(meta.get('ip_prefixes', []))
+            if subnets:
+                rule['subnets'] = sorted(subnets)
 
         # Convert to list and order
         rules = sorted(rules.values(), key=lambda r: (r['_order'], r['pool']))
@@ -1335,6 +1404,7 @@ class Ns1Provider(BaseProvider):
 
     def _generate_regions(self, record):
         pools = record.dynamic.pools
+        has_subnet = False
         has_country = False
         has_region = False
         regions = {}
@@ -1359,6 +1429,7 @@ class Ns1Provider(BaseProvider):
             georegion = set()
             us_state = set()
             ca_province = set()
+            subnet = set(rule.data.get('subnets', []))
 
             for geo in rule.data.get('geos', []):
                 n = len(geo)
@@ -1397,6 +1468,9 @@ class Ns1Provider(BaseProvider):
             if 'continents' in notes:
                 notes['continents'] = ','.join(sorted(notes['continents']))
 
+            if subnet:
+                has_subnet = True
+
             meta = {'note': self._encode_notes(notes)}
 
             if georegion:
@@ -1418,11 +1492,17 @@ class Ns1Provider(BaseProvider):
                 if ca_province:
                     country_state_meta['ca_province'] = sorted(ca_province)
                 regions[f'{pool_name}__country'] = {'meta': country_state_meta}
-            elif not georegion:
+
+            if subnet:
+                subnet_meta = dict(meta)
+                subnet_meta['ip_prefixes'] = sorted(subnet)
+                regions[f'{pool_name}__subnet'] = {'meta': subnet_meta}
+
+            if not (subnet or country or us_state or ca_province or georegion):
                 # If there's no targeting it's a catchall
                 regions[f'{pool_name}__catchall'] = {'meta': meta}
 
-        return has_country, has_region, regions
+        return has_subnet, has_country, has_region, regions
 
     def _generate_answers(self, record, regions):
         pools = record.dynamic.pools
@@ -1472,13 +1552,11 @@ class Ns1Provider(BaseProvider):
         # The regions dictionary built above already has the required pool
         # names. Iterate over them and add answers.
         answers = []
-        for pool_name in sorted(regions.keys()):
+        for pool_label in sorted(regions.keys()):
             priority = 1
 
-            # Dynamic/health checked
-            pool_label = pool_name
             # Remove the pool type from the end of the name
-            pool_name = self._parse_dynamic_pool_name(pool_name)
+            pool_name = self._parse_dynamic_pool_name(pool_label)
             self._add_answers_for_pool(
                 answers,
                 default_answers,
@@ -1493,13 +1571,17 @@ class Ns1Provider(BaseProvider):
 
     def _params_for_dynamic(self, record):
         # Convert rules to regions
-        has_country, has_region, regions = self._generate_regions(record)
+        has_subnet, has_country, has_region, regions = self._generate_regions(
+            record
+        )
 
         # Convert pools to answers
         active_monitors, answers = self._generate_answers(record, regions)
 
         # Update filters as necessary
-        filters = self._get_updated_filter_chain(has_region, has_country)
+        filters = self._get_updated_filter_chain(
+            has_region, has_country, has_subnet
+        )
 
         return {
             'answers': answers,

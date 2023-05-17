@@ -1579,6 +1579,58 @@ class TestNs1ProviderDynamic(TestCase):
             ret['regions'],
         )
 
+    @patch('octodns_ns1.Ns1Provider._monitors_for')
+    def test_params_for_dynamic_subnet_only(self, monitors_for_mock):
+        provider = Ns1Provider('test', 'api-key')
+
+        # provider._params_for_A() calls provider._monitors_for().
+        # Mock it's return value so that we don't make NS1 API calls during tests
+        monitors_for_mock.reset_mock()
+        monitors_for_mock.side_effect = [{}]
+
+        dynamic_rules = [
+            {'subnets': ['10.1.0.0/16'], 'pool': 'lhr'},
+            {'pool': 'iad'},
+        ]
+        record = Record.new(
+            self.zone,
+            '',
+            {
+                'dynamic': {
+                    'pools': {
+                        'lhr': {
+                            'values': [{'value': '3.4.5.6', 'status': 'up'}]
+                        },
+                        'iad': {
+                            'values': [{'value': '5.6.7.8', 'status': 'up'}]
+                        },
+                    },
+                    'rules': dynamic_rules,
+                },
+                'ttl': 32,
+                'type': 'A',
+                'value': '1.2.3.4',
+                'meta': {},
+            },
+        )
+        ret, _ = provider._params_for_A(record)
+        self.assertEqual(4, len(ret['answers']))
+        exp = provider._FILTER_CHAIN_WITH_SUBNET
+        self.assertEqual(ret['filters'], exp)
+        exp_regions = {
+            'iad__catchall': {'meta': {'note': 'rule-order:1'}},
+            'lhr__subnet': {
+                'meta': {'ip_prefixes': ['10.1.0.0/16'], 'note': 'rule-order:0'}
+            },
+        }
+        self.assertEqual(exp_regions, ret['regions'])
+
+        # test parsing back into the same dynamic rules
+        parsed_rules = provider._parse_rules({}, exp_regions)
+        for rule in parsed_rules:
+            del rule['_order']
+        self.assertEqual(dynamic_rules, parsed_rules)
+
     @patch('octodns_ns1.Ns1Provider._monitor_sync')
     @patch('octodns_ns1.Ns1Provider._monitors_for')
     def test_params_for_dynamic_contient_and_countries(
@@ -1693,6 +1745,180 @@ class TestNs1ProviderDynamic(TestCase):
             },
             ret['regions'],
         )
+
+    @patch('octodns_ns1.Ns1Provider._monitors_for')
+    def test_params_for_dynamic_region_and_subnet(self, monitors_for_mock):
+        provider = Ns1Provider('test', 'api-key')
+
+        # provider._params_for_A() calls provider._monitors_for().
+        # Mock it's return value so that we don't make NS1 API calls during tests
+        monitors_for_mock.reset_mock()
+        monitors_for_mock.side_effect = [{}]
+
+        dynamic_rules = [
+            {'subnets': ['10.1.0.0/16'], 'geos': ['EU'], 'pool': 'lhr'},
+            {'pool': 'iad'},
+        ]
+        record = Record.new(
+            self.zone,
+            '',
+            {
+                'dynamic': {
+                    'pools': {
+                        'lhr': {
+                            'values': [{'value': '3.4.5.6', 'status': 'up'}]
+                        },
+                        'iad': {
+                            'values': [{'value': '5.6.7.8', 'status': 'up'}]
+                        },
+                    },
+                    'rules': dynamic_rules,
+                },
+                'ttl': 32,
+                'type': 'A',
+                'value': '1.2.3.4',
+                'meta': {},
+            },
+        )
+        ret, _ = provider._params_for_A(record)
+        self.assertEqual(6, len(ret['answers']))
+        exp = provider._FILTER_CHAIN_WITH_REGION_AND_SUBNET
+        self.assertEqual(ret['filters'], exp)
+        exp_regions = {
+            'iad__catchall': {'meta': {'note': 'rule-order:1'}},
+            'lhr__subnet': {
+                'meta': {'ip_prefixes': ['10.1.0.0/16'], 'note': 'rule-order:0'}
+            },
+            'lhr__georegion': {
+                'meta': {'georegion': ['EUROPE'], 'note': 'rule-order:0'}
+            },
+        }
+        self.assertEqual(exp_regions, ret['regions'])
+
+        # test parsing back into the same dynamic rules
+        parsed_rules = provider._parse_rules({}, exp_regions)
+        for rule in parsed_rules:
+            del rule['_order']
+        self.assertEqual(dynamic_rules, parsed_rules)
+
+    @patch('octodns_ns1.Ns1Provider._monitors_for')
+    def test_params_for_dynamic_country_and_subnet(self, monitors_for_mock):
+        provider = Ns1Provider('test', 'api-key')
+
+        # provider._params_for_A() calls provider._monitors_for().
+        # Mock it's return value so that we don't make NS1 API calls during tests
+        monitors_for_mock.reset_mock()
+        monitors_for_mock.side_effect = [{}]
+
+        dynamic_rules = [
+            {'subnets': ['10.1.0.0/16'], 'geos': ['EU-GB'], 'pool': 'lhr'},
+            {'pool': 'iad'},
+        ]
+        record = Record.new(
+            self.zone,
+            '',
+            {
+                'dynamic': {
+                    'pools': {
+                        'lhr': {
+                            'values': [{'value': '3.4.5.6', 'status': 'up'}]
+                        },
+                        'iad': {
+                            'values': [{'value': '5.6.7.8', 'status': 'up'}]
+                        },
+                    },
+                    'rules': dynamic_rules,
+                },
+                'ttl': 32,
+                'type': 'A',
+                'value': '1.2.3.4',
+                'meta': {},
+            },
+        )
+        ret, _ = provider._params_for_A(record)
+        self.assertEqual(6, len(ret['answers']))
+        exp = provider._FILTER_CHAIN_WITH_COUNTRY_AND_SUBNET
+        self.assertEqual(ret['filters'], exp)
+        exp_regions = {
+            'iad__catchall': {'meta': {'note': 'rule-order:1'}},
+            'lhr__subnet': {
+                'meta': {'ip_prefixes': ['10.1.0.0/16'], 'note': 'rule-order:0'}
+            },
+            'lhr__country': {
+                'meta': {'country': ['GB'], 'note': 'rule-order:0'}
+            },
+        }
+        self.assertEqual(exp_regions, ret['regions'])
+
+        # test parsing back into the same dynamic rules
+        parsed_rules = provider._parse_rules({}, exp_regions)
+        for rule in parsed_rules:
+            del rule['_order']
+        self.assertEqual(dynamic_rules, parsed_rules)
+
+    @patch('octodns_ns1.Ns1Provider._monitors_for')
+    def test_params_for_dynamic_region_and_country_and_subnet(
+        self, monitors_for_mock
+    ):
+        provider = Ns1Provider('test', 'api-key')
+
+        # provider._params_for_A() calls provider._monitors_for().
+        # Mock it's return value so that we don't make NS1 API calls during tests
+        monitors_for_mock.reset_mock()
+        monitors_for_mock.side_effect = [{}]
+
+        dynamic_rules = [
+            {
+                'subnets': ['10.1.0.0/16'],
+                'geos': ['AF', 'EU-GB'],
+                'pool': 'lhr',
+            },
+            {'pool': 'iad'},
+        ]
+        record = Record.new(
+            self.zone,
+            '',
+            {
+                'dynamic': {
+                    'pools': {
+                        'lhr': {
+                            'values': [{'value': '3.4.5.6', 'status': 'up'}]
+                        },
+                        'iad': {
+                            'values': [{'value': '5.6.7.8', 'status': 'up'}]
+                        },
+                    },
+                    'rules': dynamic_rules,
+                },
+                'ttl': 32,
+                'type': 'A',
+                'value': '1.2.3.4',
+                'meta': {},
+            },
+        )
+        ret, _ = provider._params_for_A(record)
+        self.assertEqual(8, len(ret['answers']))
+        exp = provider._FILTER_CHAIN_WITH_REGION_AND_COUNTRY_AND_SUBNET
+        self.assertEqual(ret['filters'], exp)
+        exp_regions = {
+            'iad__catchall': {'meta': {'note': 'rule-order:1'}},
+            'lhr__subnet': {
+                'meta': {'ip_prefixes': ['10.1.0.0/16'], 'note': 'rule-order:0'}
+            },
+            'lhr__country': {
+                'meta': {'country': ['GB'], 'note': 'rule-order:0'}
+            },
+            'lhr__georegion': {
+                'meta': {'georegion': ['AFRICA'], 'note': 'rule-order:0'}
+            },
+        }
+        self.assertEqual(exp_regions, ret['regions'])
+
+        # test parsing back into the same dynamic rules
+        parsed_rules = provider._parse_rules({}, exp_regions)
+        for rule in parsed_rules:
+            del rule['_order']
+        self.assertEqual(dynamic_rules, parsed_rules)
 
     @patch('octodns_ns1.Ns1Provider._monitor_sync')
     @patch('octodns_ns1.Ns1Provider._monitors_for')
@@ -1841,7 +2067,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         # Test out a small, but realistic setup that covers all the options
         # We have country and region in the test config
-        filters = provider._get_updated_filter_chain(True, True)
+        filters = provider._get_updated_filter_chain(True, True, False)
         catchall_pool_name = 'iad__catchall'
         ns1_record = {
             'answers': [
@@ -2146,7 +2372,7 @@ class TestNs1ProviderDynamic(TestCase):
         # Everything else is same as dynamic A whose tests will cover all
         # other options and test cases
         # Not testing for geo/region specific cases
-        filters = provider._get_updated_filter_chain(False, False)
+        filters = provider._get_updated_filter_chain(False, False, False)
         catchall_pool_name = 'iad__catchall'
         ns1_record = {
             'answers': [
@@ -2203,7 +2429,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         # Potential setup created outside of octoDNS, so it could be missing
         # notes and region names can be arbitrary
-        filters = provider._get_updated_filter_chain(False, False)
+        filters = provider._get_updated_filter_chain(False, False, False)
         ns1_record = {
             'answers': [
                 {
@@ -2344,7 +2570,9 @@ class TestNs1ProviderDynamic(TestCase):
         reset()
         # Generate what we expect to have
         provider.record_filters[dynamic.fqdn[:-1]] = {
-            dynamic._type: provider._get_updated_filter_chain(False, False)
+            dynamic._type: provider._get_updated_filter_chain(
+                False, False, False
+            )
         }
         gend = provider._monitor_gen(dynamic, '1.2.3.4')
         gend.update(

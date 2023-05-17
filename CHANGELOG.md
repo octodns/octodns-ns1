@@ -5,6 +5,7 @@
   a previous version that doesn't support modern HTTP monitors. It also doesn't
   honor the `http_version` configuration because these monitors can only talk
   HTTP/1.1.
+* Newly added support for subnet targeting using the Netfence Prefix filter
 
 ## v0.0.4 - 2023-04-06 - More (accurately) Dynamic
 

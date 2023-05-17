@@ -87,6 +87,10 @@ Ns1Provider supports full root NS record management.
 
 Ns1Provider supports dynamic records.
 
+#### Subnet targeting
+
+Ns1Provider supports [subnet targeting](https://github.com/octodns/octodns/blob/main/docs/dynamic_records.md#subnets) in dynamic records.
+
 #### Health Check Options
 
 See https://github.com/octodns/octodns/blob/master/docs/dynamic_records.md#health-checks for information on health checking for dynamic records. Ns1Provider supports the following options:
