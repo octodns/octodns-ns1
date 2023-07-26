@@ -1,4 +1,4 @@
-## v0.0.5 - 2023-??-?? - ???
+## v0.0.5 - 2023-07-27 - Dynamic Subnets
 
 * Allow using actual HTTP monitors instead of emulating them in TCP monitors.
   Doing this is not forward-compatible, ie octodns-ns1 cannot be downgraded to
