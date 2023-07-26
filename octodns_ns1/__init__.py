@@ -18,7 +18,7 @@ from octodns.provider.base import BaseProvider
 from octodns.record import Record, Update
 from octodns.record.geo_data import geo_data
 
-__VERSION__ = '0.0.4'
+__VERSION__ = '0.0.5'
 
 
 def _ensure_endswith_dot(string):
