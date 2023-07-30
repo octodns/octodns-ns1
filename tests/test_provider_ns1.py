@@ -3,7 +3,6 @@
 #
 
 from collections import defaultdict
-from logging import getLogger
 from unittest import TestCase
 from unittest.mock import call, patch
 
@@ -415,7 +414,14 @@ class TestNs1Provider(TestCase):
         # Its tier 2 so we'll do a full lookup
         record_retrieve_mock.side_effect = ns1_zone['records']
         zone = Zone('unit.tests.', [])
-        provider.populate(zone, lenient=True)
+        with self.assertLogs('Ns1Provider[test]', 'WARNING') as cm:
+            provider.populate(zone, lenient=True)
+        self.assertEqual(
+            [
+                'WARNING:Ns1Provider[test]:Cannot parse unsupported.unit.tests dynamic record due to missing pool name in first answer note, treating it as an empty record'
+            ],
+            cm.output,
+        )
         self.assertEqual(
             set(
                 [
@@ -432,18 +438,6 @@ class TestNs1Provider(TestCase):
         self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
         record_retrieve_mock.assert_has_calls(
             [call('unit.tests', 'unsupported.unit.tests', 'CNAME')]
-        )
-        # make sure we logged about the problem, this is kind of hacky so it's
-        # possible the test will eventually fail b/c something underlying has
-        # changed
-        log_handler = getLogger().handlers[-1]
-        self.assertEqual(3, len(log_handler.records))
-        log_record = log_handler.records[0]
-        self.assertEqual(
-            'Cannot parse unsupported.unit.tests dynamic record '
-            'due to missing pool name in first answer note, '
-            'treating it as an empty record',
-            log_record.message,
         )
 
     @patch('ns1.rest.records.Records.delete')
