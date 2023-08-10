@@ -15,6 +15,7 @@ from ns1.rest.errors import RateLimitException, ResourceException
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
 from octodns.record import Record, Update
+from octodns.record.geo import GeoCodes
 from octodns.record.geo_data import geo_data
 
 __VERSION__ = '0.0.5'
@@ -22,16 +23,6 @@ __VERSION__ = '0.0.5'
 
 def _ensure_endswith_dot(string):
     return string if string.endswith('.') else f'{string}.'
-
-
-country_to_continent = {}
-for continent, countries in geo_data.items():
-    for country in countries.keys():
-        country_to_continent[country] = continent
-
-
-def country_alpha2_to_continent_code(country):
-    return country_to_continent[country]
 
 
 class Ns1Exception(ProviderException):
@@ -589,8 +580,7 @@ class Ns1Provider(BaseProvider):
                 us_state = meta.get('us_state', [])
                 ca_province = meta.get('ca_province', [])
                 for cntry in country:
-                    con = country_alpha2_to_continent_code(cntry)
-                    key = f'{con}-{cntry}'
+                    key = GeoCodes.country_to_code(cntry)
                     geo[key].extend(answer['answer'])
                 for state in us_state:
                     key = f'NA-US-{state}'
@@ -699,12 +689,13 @@ class Ns1Provider(BaseProvider):
 
         special_continents = dict()
         for country in meta.get('country', []):
-            con = country_alpha2_to_continent_code(country)
+            geo_code = GeoCodes.country_to_code(country)
+            con = GeoCodes.parse(geo_code)['continent_code']
 
             if con in self._CONTINENT_TO_LIST_OF_COUNTRIES:
                 special_continents.setdefault(con, set()).add(country)
             else:
-                geos.add(f'{con}-{country}')
+                geos.add(geo_code)
 
         for continent, countries in special_continents.items():
             if (
