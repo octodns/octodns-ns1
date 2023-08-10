@@ -1,3 +1,7 @@
+## v0.0.6 - 2023-??-?? - ???
+
+* Adds Provider.list_zones to enable new dynamic zone config functionality
+
 ## v0.0.5 - 2023-07-27 - Dynamic Subnets
 
 * Allow using actual HTTP monitors instead of emulating them in TCP monitors.
