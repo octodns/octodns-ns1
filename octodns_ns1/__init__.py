@@ -11,7 +11,6 @@ from uuid import uuid4
 
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
-from pycountry_convert import country_alpha2_to_continent_code
 
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
@@ -23,6 +22,16 @@ __VERSION__ = '0.0.5'
 
 def _ensure_endswith_dot(string):
     return string if string.endswith('.') else f'{string}.'
+
+
+country_to_continent = {}
+for continent, countries in geo_data.items():
+    for country in countries.keys():
+        country_to_continent[country] = continent
+
+
+def country_alpha2_to_continent_code(country):
+    return country_to_continent[country]
 
 
 class Ns1Exception(ProviderException):
@@ -690,17 +699,7 @@ class Ns1Provider(BaseProvider):
 
         special_continents = dict()
         for country in meta.get('country', []):
-            # country_alpha2_to_continent_code fails for Pitcairn ('PN'),
-            # United States Minor Outlying Islands ('UM') and
-            # Sint Maarten ('SX')
-            if country == 'TL':
-                con = 'AS'
-            elif country == 'SX':
-                con = 'NA'
-            elif country in ('PN', 'UM'):
-                con = 'OC'
-            else:
-                con = country_alpha2_to_continent_code(country)
+            con = country_alpha2_to_continent_code(country)
 
             if con in self._CONTINENT_TO_LIST_OF_COUNTRIES:
                 special_continents.setdefault(con, set()).add(country)
