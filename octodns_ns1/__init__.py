@@ -262,6 +262,10 @@ class Ns1Client(object):
             self._zones_cache[name] = self._try(self._zones.retrieve, name)
         return self._zones_cache[name]
 
+    def zones_list(self):
+        # TODO: explore caching all of these if they have sufficient details
+        return self._try(self._zones.list)
+
     def _try(self, method, *args, **kwargs):
         tries = self.retry_count
         while True:  # We'll raise to break after our tries expire
@@ -910,6 +914,9 @@ class Ns1Provider(BaseProvider):
                 }
             )
         return {'ttl': record['ttl'], 'type': _type, 'values': values}
+
+    def list_zones(self):
+        return sorted([f'{z["zone"]}.' for z in self._client.zones_list()])
 
     def populate(self, zone, target=False, lenient=False):
         self.log.debug(
