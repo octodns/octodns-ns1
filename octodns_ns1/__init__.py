@@ -1760,7 +1760,7 @@ class Ns1Provider(BaseProvider):
                 and isinstance(change, Create)
             ):
                 change.__class__ = Update
-                return
+        return
 
     def _apply_Create(self, ns1_zone, change):
         new = change.new
