@@ -15,7 +15,7 @@ from pycountry_convert import country_alpha2_to_continent_code
 
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
-from octodns.record import Record, Update
+from octodns.record import Create, NsRecord, Record, Update
 from octodns.record.geo_data import geo_data
 
 __VERSION__ = '0.0.5'
@@ -1747,6 +1747,21 @@ class Ns1Provider(BaseProvider):
 
         return extra
 
+    def _force_root_ns_update(self, changes):
+        '''
+        Changes any 'Create' changetype for a root NS record to an 'Update'
+        changetype. Used on new zone creation, since NS1 will automatically create root NS records (see https://ns1.com/api?docId=2184).
+        This means our desired NS records must be applied as an Update, rather than a Create.
+        '''
+        for change in changes:
+            if (
+                change.record.name == ""
+                and isinstance(change.record, NsRecord)
+                and isinstance(change, Create)
+            ):
+                change.__class__ = Update
+                return
+
     def _apply_Create(self, ns1_zone, change):
         new = change.new
         zone = new.zone.name[:-1]
@@ -1763,9 +1778,12 @@ class Ns1Provider(BaseProvider):
         _type = new._type
         params, active_monitor_ids = getattr(self, f'_params_for_{_type}')(new)
         self._client.records_update(zone, domain, _type, **params)
-        # If we're cleaning up we need to send in the old record since it'd
-        # have anything that needs cleaning up
-        self._monitors_gc(change.existing, active_monitor_ids)
+        # It's possible change.existing is None because in the case of zone creation, we swap out the NS record Create for an Update, but we don't set the existing
+        # record (see _force_root_ns_update).
+        if change.existing is not None:
+            # If we're cleaning up we need to send in the old record since it'd
+            # have anything that needs cleaning up
+            self._monitors_gc(change.existing, active_monitor_ids)
 
     def _apply_Delete(self, ns1_zone, change):
         existing = change.existing
@@ -1803,6 +1821,7 @@ class Ns1Provider(BaseProvider):
                 raise
             self.log.debug('_apply:   no matching zone, creating')
             ns1_zone = self._client.zones_create(domain_name)
+            self._force_root_ns_update(changes)
 
         for change in changes:
             class_name = change.__class__.__name__
