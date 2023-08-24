@@ -1760,7 +1760,7 @@ class Ns1Provider(BaseProvider):
                     '_force_root_ns_update: found root NS record creation, changing to update'
                 )
                 changes[i] = Update(None, change.record)
-        return
+        return changes
 
     def _apply_Create(self, ns1_zone, change):
         new = change.new
@@ -1821,7 +1821,7 @@ class Ns1Provider(BaseProvider):
                 raise
             self.log.debug('_apply:   no matching zone, creating')
             ns1_zone = self._client.zones_create(domain_name)
-            self._force_root_ns_update(changes)
+            changes = self._force_root_ns_update(changes)
 
         for change in changes:
             class_name = change.__class__.__name__
