@@ -11,11 +11,11 @@ from uuid import uuid4
 
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
-from pycountry_convert import country_alpha2_to_continent_code
 
 from octodns.provider import ProviderException
 from octodns.provider.base import BaseProvider
 from octodns.record import Create, Record, Update
+from octodns.record.geo import GeoCodes
 from octodns.record.geo_data import geo_data
 
 __VERSION__ = '0.0.5'
@@ -261,6 +261,10 @@ class Ns1Client(object):
         if name not in self._zones_cache:
             self._zones_cache[name] = self._try(self._zones.retrieve, name)
         return self._zones_cache[name]
+
+    def zones_list(self):
+        # TODO: explore caching all of these if they have sufficient details
+        return self._try(self._zones.list)
 
     def _try(self, method, *args, **kwargs):
         tries = self.retry_count
@@ -580,8 +584,7 @@ class Ns1Provider(BaseProvider):
                 us_state = meta.get('us_state', [])
                 ca_province = meta.get('ca_province', [])
                 for cntry in country:
-                    con = country_alpha2_to_continent_code(cntry)
-                    key = f'{con}-{cntry}'
+                    key = GeoCodes.country_to_code(cntry)
                     geo[key].extend(answer['answer'])
                 for state in us_state:
                     key = f'NA-US-{state}'
@@ -690,22 +693,13 @@ class Ns1Provider(BaseProvider):
 
         special_continents = dict()
         for country in meta.get('country', []):
-            # country_alpha2_to_continent_code fails for Pitcairn ('PN'),
-            # United States Minor Outlying Islands ('UM') and
-            # Sint Maarten ('SX')
-            if country == 'TL':
-                con = 'AS'
-            elif country == 'SX':
-                con = 'NA'
-            elif country in ('PN', 'UM'):
-                con = 'OC'
-            else:
-                con = country_alpha2_to_continent_code(country)
+            geo_code = GeoCodes.country_to_code(country)
+            con = GeoCodes.parse(geo_code)['continent_code']
 
             if con in self._CONTINENT_TO_LIST_OF_COUNTRIES:
                 special_continents.setdefault(con, set()).add(country)
             else:
-                geos.add(f'{con}-{country}')
+                geos.add(geo_code)
 
         for continent, countries in special_continents.items():
             if (
@@ -920,6 +914,9 @@ class Ns1Provider(BaseProvider):
                 }
             )
         return {'ttl': record['ttl'], 'type': _type, 'values': values}
+
+    def list_zones(self):
+        return sorted([f'{z["zone"]}.' for z in self._client.zones_list()])
 
     def populate(self, zone, target=False, lenient=False):
         self.log.debug(

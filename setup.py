@@ -58,7 +58,6 @@ setup(
     install_requires=(
         'octodns>=1.0.0rc0',
         'ns1_python>=0.17.1',
-        'pycountry-convert>=0.7.2',
         'requests>=2.27.1',
     ),
     license='MIT',

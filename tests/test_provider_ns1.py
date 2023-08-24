@@ -3258,3 +3258,16 @@ class TestNs1Client(TestCase):
         meta = {'country': ('PN', 'UM')}
         geos = provider._parse_rule_geos(meta, notes)
         self.assertEqual({'OC-PN', 'OC-UM'}, geos)
+
+    @patch('ns1.rest.zones.Zones.list')
+    def test_zones_list(self, mock):
+        data = [
+            {'a': 42, 'zone': 'other.net'},
+            {'other': 'stuff', 'zone': 'first.com'},
+        ]
+        mock.side_effect = [data, data]
+
+        provider = Ns1Provider('test', 'api-key')
+
+        self.assertEqual(data, provider._client.zones_list())
+        self.assertEqual(['first.com.', 'other.net.'], provider.list_zones())
