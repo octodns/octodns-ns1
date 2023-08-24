@@ -1750,7 +1750,7 @@ class Ns1Provider(BaseProvider):
         changetype. Used on new zone creation, since NS1 will automatically create root NS records (see https://ns1.com/api?docId=2184).
         This means our desired NS records must be applied as an Update, rather than a Create.
         '''
-        for change in changes:
+        for i, change in enumerate(changes):
             if (
                 change.record.name == ''
                 and change.record._type == 'NS'
@@ -1759,7 +1759,7 @@ class Ns1Provider(BaseProvider):
                 self.log.info(
                     '_force_root_ns_update: found root NS record creation, changing to update'
                 )
-                change.__class__ = Update
+                changes[i] = Update(None, change.record)
         return
 
     def _apply_Create(self, ns1_zone, change):
