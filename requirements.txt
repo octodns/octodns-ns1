@@ -7,8 +7,8 @@ fqdn==1.5.1
 idna==3.4
 natsort==8.4.0
 ns1-python==0.18.0
-octodns==1.0.0
+octodns==1.2.0
 python-dateutil==2.8.2
 requests==2.31.0
 six==1.16.0
-urllib3==2.0.4
+urllib3==2.0.5

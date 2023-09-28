@@ -1,6 +1,8 @@
-## v0.0.6 - 2023-??-?? - ???
+## v0.0.6 - 2023-09-28 - Dynamic zones & bug fixes
 
 * Adds Provider.list_zones to enable new dynamic zone config functionality
+* Fix bug around root NS records when creating a new zone. See https://github.com/octodns/octodns-ns1/issues/48
+* Bump to [octodns v1.2.0](https://pypi.org/project/octodns/1.2.0/) to pull subnet-targeting related bug fixes
 
 ## v0.0.5 - 2023-07-27 - Dynamic Subnets
 
