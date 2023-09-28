@@ -56,7 +56,7 @@ setup(
         'test': tests_require,
     },
     install_requires=(
-        'octodns>=1.0.0rc0',
+        'octodns>=1.2.0',
         'ns1_python>=0.17.1',
         'requests>=2.27.1',
     ),

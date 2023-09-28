@@ -1,6 +1,7 @@
-## v0.0.6 - 2023-??-?? - ???
+## v0.0.6 - 2023-09-28 - Dynamic zones & subnet targeting fixes
 
 * Adds Provider.list_zones to enable new dynamic zone config functionality
+* Bump to [octodns v1.2.0](https://pypi.org/project/octodns/1.2.0/) to pull subnet-targeting related bug fixes
 
 ## v0.0.5 - 2023-07-27 - Dynamic Subnets
 
