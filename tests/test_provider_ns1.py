@@ -543,15 +543,6 @@ class TestNs1Provider(TestCase):
                 ),
                 call(
                     'unit.tests',
-                    'unit.tests',
-                    'NS',
-                    answers=['ns1.unit.tests.', 'ns2.unit.tests.'],
-                    filters=[],
-                    regions={},
-                    ttl=37,
-                ),
-                call(
-                    'unit.tests',
                     '1.2.3.4.unit.tests',
                     'PTR',
                     answers=['one.one.one.one.', 'two.two.two.two.'],
@@ -559,6 +550,20 @@ class TestNs1Provider(TestCase):
                 ),
             ],
             any_order=True,
+        )
+        # New zone was created, so we should update NS records instead of creating
+        record_update_mock.assert_has_calls(
+            [
+                call(
+                    'unit.tests',
+                    'unit.tests',
+                    'NS',
+                    answers=['ns1.unit.tests.', 'ns2.unit.tests.'],
+                    filters=[],
+                    regions={},
+                    ttl=37,
+                )
+            ]
         )
 
         # Update & delete
