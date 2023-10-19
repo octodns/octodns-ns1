@@ -273,6 +273,7 @@ class TestNs1Provider(TestCase):
             provider._client.reset_caches()
             zone_retrieve_mock.reset_mock()
             zone_retrieve_mock.side_effect = None
+            zone_retrieve_mock.__name__ = 'retrieve'
             record_retrieve_mock.reset_mock()
             record_retrieve_mock.side_effect = None
 
@@ -470,7 +471,9 @@ class TestNs1Provider(TestCase):
             provider._client.reset_caches()
             record_retrieve_mock.reset_mock()
             zone_create_mock.reset_mock()
+            zone_create_mock.__name__ = 'create'
             zone_retrieve_mock.reset_mock()
+            zone_retrieve_mock.__name__ = 'retrieve'
 
         # Fails, general error
         reset()

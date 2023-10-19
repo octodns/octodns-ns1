@@ -283,6 +283,14 @@ class Ns1Client(object):
                 )
                 sleep(period)
                 tries -= 1
+            except ResourceException as e:
+                self.log.debug(
+                    "_try: method=%s, args=%s, error=%s",
+                    method.__name__,
+                    str(args),
+                    e.message,
+                )
+                raise
 
 
 class Ns1Provider(BaseProvider):
