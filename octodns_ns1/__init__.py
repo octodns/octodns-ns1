@@ -284,11 +284,12 @@ class Ns1Client(object):
                 sleep(period)
                 tries -= 1
             except ResourceException as e:
-                self.log.debug(
-                    "_try: method=%s, args=%s, error=%s",
+                self.log.exception(
+                    "_try: method=%s, args=%s, response=%s, body=%s",
                     method.__name__,
                     str(args),
-                    e.message,
+                    e.response,
+                    e.body,
                 )
                 raise
 
