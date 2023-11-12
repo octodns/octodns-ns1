@@ -492,10 +492,13 @@ class TestNs1Provider(TestCase):
             provider.apply(plan)
         self.assertEqual(zone_create_mock.side_effect, ctx.exception)
 
-        # non-existent zone, create
+        # non-existent zone/404, create
+        class DummyResponse:
+            status_code = 404
+
         reset()
         zone_retrieve_mock.side_effect = ResourceException(
-            'server error: zone not found'
+            'server error: zone not found', response=DummyResponse(), body='x'
         )
 
         zone_create_mock.side_effect = ['foo']
