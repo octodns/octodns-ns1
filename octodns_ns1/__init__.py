@@ -19,7 +19,7 @@ from octodns.record.geo import GeoCodes
 from octodns.record.geo_data import geo_data
 
 # TODO: remove __VERSION__ with the next major version release
-__version__ = __VERSION__ = '0.0.6'
+__version__ = __VERSION__ = '0.0.7'
 
 
 def _ensure_endswith_dot(string):

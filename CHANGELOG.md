@@ -1,3 +1,9 @@
+## v0.0.7 - 2023-11-14 - Maintenance release
+
+* Improved NS1 API error logging
+* Misc improvements to the CI setup, documentation and fix to the release
+  packaging metadata
+
 ## v0.0.6 - 2023-09-28 - Dynamic zones & bug fixes
 
 * Adds Provider.list_zones to enable new dynamic zone config functionality
