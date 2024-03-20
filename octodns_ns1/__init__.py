@@ -868,14 +868,9 @@ class Ns1Provider(BaseProvider):
     def _data_for_NAPTR(self, _type, record):
         values = []
         for answer in record['short_answers']:
-            (
-                order,
-                preference,
-                flags,
-                service,
-                regexp,
-                replacement,
-            ) = answer.split(' ', 5)
+            (order, preference, flags, service, regexp, replacement) = (
+                answer.split(' ', 5)
+            )
             values.append(
                 {
                     'flags': flags,
@@ -1444,9 +1439,11 @@ class Ns1Provider(BaseProvider):
                 if n == 8:
                     # US state, e.g. NA-US-KY
                     # CA province, e.g. NA-CA-NL
-                    us_state.add(
-                        geo[-2:]
-                    ) if "NA-US" in geo else ca_province.add(geo[-2:])
+                    (
+                        us_state.add(geo[-2:])
+                        if "NA-US" in geo
+                        else ca_province.add(geo[-2:])
+                    )
                     # For filtering. State filtering is done by the country
                     # filter
                     has_country = True
