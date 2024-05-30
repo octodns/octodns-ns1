@@ -310,12 +310,15 @@ class Ns1Provider(BaseProvider):
             'ALIAS',
             'CAA',
             'CNAME',
+            'DNAME',
+            'DS',
             'MX',
             'NAPTR',
             'NS',
             'PTR',
             'SPF',
             'SRV',
+            'TLSA',
             'TXT',
             'URLFWD',
         )
@@ -857,6 +860,7 @@ class Ns1Provider(BaseProvider):
         return {'ttl': record['ttl'], 'type': _type, 'value': value}
 
     _data_for_ALIAS = _data_for_CNAME
+    _data_for_DNAME = _data_for_CNAME
 
     def _data_for_MX(self, _type, record):
         values = []
@@ -917,6 +921,39 @@ class Ns1Provider(BaseProvider):
                     'code': code,
                     'masking': masking,
                     'query': query,
+                }
+            )
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
+
+    def _data_for_DS(self, _type, record):
+        values = []
+        for answer in record['short_answers']:
+            key_tag, algorithm, digest_type, digest = answer.split(' ', 3)
+            values.append(
+                {
+                    'key_tag': key_tag,
+                    'algorithm': algorithm,
+                    'digest_type': digest_type,
+                    'digest': digest,
+                }
+            )
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
+
+    def _data_for_TLSA(self, _type, record):
+        values = []
+        for answer in record['short_answers']:
+            (
+                certificate_usage,
+                selector,
+                matching_type,
+                certificate_association_data,
+            ) = answer.split(' ', 3)
+            values.append(
+                {
+                    'certificate_usage': certificate_usage,
+                    'selector': selector,
+                    'matching_type': matching_type,
+                    'certificate_association_data': certificate_association_data,
                 }
             )
         return {'ttl': record['ttl'], 'type': _type, 'values': values}
@@ -1636,6 +1673,7 @@ class Ns1Provider(BaseProvider):
         }, None
 
     _params_for_ALIAS = _params_for_CNAME
+    _params_for_DNAME = _params_for_CNAME
 
     def _params_for_MX(self, record):
         values = [(v.preference, v.exchange) for v in record.values]
@@ -1660,6 +1698,25 @@ class Ns1Provider(BaseProvider):
     def _params_for_URLFWD(self, record):
         values = [
             (v.path, v.target, v.code, v.masking, v.query)
+            for v in record.values
+        ]
+        return {'answers': values, 'ttl': record.ttl}, None
+
+    def _params_for_DS(self, record):
+        values = [
+            (v.key_tag, v.algorithm, v.digest_type, v.digest)
+            for v in record.values
+        ]
+        return {'answers': values, 'ttl': record.ttl}, None
+
+    def _params_for_TLSA(self, record):
+        values = [
+            (
+                v.certificate_usage,
+                v.selector,
+                v.matching_type,
+                v.certificate_association_data,
+            )
             for v in record.values
         ]
         return {'answers': values, 'ttl': record.ttl}, None

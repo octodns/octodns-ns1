@@ -182,6 +182,49 @@ class TestNs1Provider(TestCase):
             },
         )
     )
+    expected.add(
+        Record.new(
+            zone,
+            'dname',
+            {'ttl': 43, 'type': 'DNAME', 'value': 'foo.unit.tests.'},
+        )
+    )
+    expected.add(
+        Record.new(
+            zone,
+            'ds',
+            {
+                'ttl': 44,
+                'type': 'DS',
+                'values': [
+                    {
+                        'key_tag': '60485',
+                        'algorithm': 5,
+                        'digest_type': 1,
+                        'digest': '2BB183AF5F22588179A53B0A98631FAD1A292118',
+                    }
+                ],
+            },
+        )
+    )
+    expected.add(
+        Record.new(
+            zone,
+            'tlsa',
+            {
+                'ttl': 45,
+                'type': 'TLSA',
+                'values': [
+                    {
+                        'certificate_usage': 1,
+                        'selector': 1,
+                        'matching_type': 1,
+                        'certificate_association_data': '8755CDAA8FE24EF16CC0F2C918063185E433FAAF1415664911D9E30A924138C4',
+                    }
+                ],
+            },
+        )
+    )
 
     ns1_records = [
         {
@@ -261,6 +304,28 @@ class TestNs1Provider(TestCase):
             'ttl': 42,
             'short_answers': ['one.one.one.one.', 'two.two.two.two.'],
             'domain': '1.2.3.4.unit.tests.',
+        },
+        {
+            'type': 'DNAME',
+            'ttl': 43,
+            'short_answers': ['foo.unit.tests.'],
+            'domain': 'dname.unit.tests.',
+        },
+        {
+            'type': 'DS',
+            'ttl': 44,
+            'short_answers': [
+                '60485 5 1 2BB183AF5F22588179A53B0A98631FAD1A292118'
+            ],
+            'domain': 'ds.unit.tests.',
+        },
+        {
+            'type': 'TLSA',
+            'ttl': 45,
+            'short_answers': [
+                '1 1 1 8755CDAA8FE24EF16CC0F2C918063185E433FAAF1415664911D9E30A924138C4'
+            ],
+            'domain': 'tlsa.unit.tests.',
         },
     ]
 
