@@ -1,3 +1,7 @@
+## v0.0.8 - 2024-??-?? - 
+
+* DNAME, DS, and TLSA record type support added.
+
 ## v0.0.7 - 2023-11-14 - Maintenance release
 
 * Improved NS1 API error logging
