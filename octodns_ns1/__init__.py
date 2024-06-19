@@ -12,7 +12,7 @@ from uuid import uuid4
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
 
-from octodns.provider import ProviderException
+from octodns.provider import ProviderException, SupportsException
 from octodns.provider.base import BaseProvider
 from octodns.record import Create, Record, Update
 from octodns.record.geo import GeoCodes
@@ -1028,6 +1028,17 @@ class Ns1Provider(BaseProvider):
             exists,
         )
         return exists
+
+    def _process_desired_zone(self, desired):
+        for record in desired.records:
+            if getattr(record, 'dynamic', False):
+                protocol = record.healthcheck_protocol
+                if protocol not in ('HTTP', 'HTTPS', 'ICMP', 'TCP'):
+                    msg = f'healthcheck protocol "{protocol}" not supported'
+                    # no workable fallbacks so straight error
+                    raise SupportsException(f'{self.id}: {msg}')
+
+        return super()._process_desired_zone(desired)
 
     def _params_for_geo_A(self, record):
         # purposefully set non-geo answers to have an empty meta,
