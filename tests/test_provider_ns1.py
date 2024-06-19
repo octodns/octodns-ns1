@@ -1254,6 +1254,33 @@ class TestNs1ProviderDynamic(TestCase):
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(value[:-1] in monitor['config']['url'])
 
+    def test_monitor_gen_ICMP(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
+
+        value = '1.2.3.4'
+        record = self.record()
+        record._octodns['healthcheck']['protocol'] = 'ICMP'
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('ping', monitor['job_type'])
+        self.assertEqual(
+            provider._healthcheck_response_timeout(record) * 1000,
+            monitor['config']['timeout'],
+        )
+        self.assertEqual(
+            provider._healthcheck_response_timeout(record) * 250,
+            monitor['config']['interval'],
+        )
+        self.assertFalse(monitor['config']['ipv6'])
+        self.assertTrue(value in monitor['config']['host'])
+
+        value = '::ffff:3.4.5.6'
+        record = self.aaaa_record()
+        record._octodns['healthcheck']['protocol'] = 'ICMP'
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('ping', monitor['job_type'])
+        self.assertTrue(monitor['config']['ipv6'])
+        self.assertTrue(value in monitor['config']['host'])
+
     def test_monitor_is_match(self):
         provider = Ns1Provider('test', 'api-key')
 

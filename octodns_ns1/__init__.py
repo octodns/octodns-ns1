@@ -1235,7 +1235,17 @@ class Ns1Provider(BaseProvider):
         connect_timeout = self._healthcheck_connect_timeout(record)
         response_timeout = self._healthcheck_response_timeout(record)
 
-        if record.healthcheck_protocol == 'TCP' or not self.use_http_monitors:
+        healthcheck_protocol = record.healthcheck_protocol
+        if healthcheck_protocol == 'ICMP':
+            ret['job_type'] = 'ping'
+            ret['config'] = {
+                'count': 4,
+                'host': value,
+                'interval': response_timeout * 250,  # 1/4 response_timeout
+                'ipv6': _type == 'AAAA',
+                'timeout': response_timeout * 1000,
+            }
+        elif healthcheck_protocol == 'TCP' or not self.use_http_monitors:
             ret['job_type'] = 'tcp'
             ret['config'] = {
                 'host': value,
@@ -1243,10 +1253,10 @@ class Ns1Provider(BaseProvider):
                 # TCP monitors use milliseconds, so convert from seconds to milliseconds
                 'connect_timeout': connect_timeout * 1000,
                 'response_timeout': response_timeout * 1000,
-                'ssl': record.healthcheck_protocol == 'HTTPS',
+                'ssl': healthcheck_protocol == 'HTTPS',
             }
 
-            if record.healthcheck_protocol != 'TCP':
+            if healthcheck_protocol != 'TCP':
                 # legacy HTTP-emulating TCP monitor
                 # we need to send the HTTP request string
                 path = record.healthcheck_path
@@ -1268,7 +1278,7 @@ class Ns1Provider(BaseProvider):
         else:
             # modern HTTP monitor
             ret['job_type'] = 'http'
-            proto = record.healthcheck_protocol.lower()
+            proto = healthcheck_protocol.lower()
             domain = f'[{value}]' if _type == 'AAAA' else value
             port = record.healthcheck_port
             path = record.healthcheck_path
