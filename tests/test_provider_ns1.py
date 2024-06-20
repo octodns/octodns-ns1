@@ -8,6 +8,7 @@ from unittest.mock import call, patch
 
 from ns1.rest.errors import AuthException, RateLimitException, ResourceException
 
+from octodns.provider import SupportsException
 from octodns.provider.plan import Plan
 from octodns.record import Delete, Record, Update
 from octodns.zone import Zone
@@ -1254,6 +1255,33 @@ class TestNs1ProviderDynamic(TestCase):
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(value[:-1] in monitor['config']['url'])
 
+    def test_monitor_gen_ICMP(self):
+        provider = Ns1Provider('test', 'api-key', use_http_monitors=True)
+
+        value = '1.2.3.4'
+        record = self.record()
+        record._octodns['healthcheck']['protocol'] = 'ICMP'
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('ping', monitor['job_type'])
+        self.assertEqual(
+            provider._healthcheck_response_timeout(record) * 1000,
+            monitor['config']['timeout'],
+        )
+        self.assertEqual(
+            provider._healthcheck_response_timeout(record) * 250,
+            monitor['config']['interval'],
+        )
+        self.assertFalse(monitor['config']['ipv6'])
+        self.assertTrue(value in monitor['config']['host'])
+
+        value = '::ffff:3.4.5.6'
+        record = self.aaaa_record()
+        record._octodns['healthcheck']['protocol'] = 'ICMP'
+        monitor = provider._monitor_gen(record, value)
+        self.assertEqual('ping', monitor['job_type'])
+        self.assertTrue(monitor['config']['ipv6'])
+        self.assertTrue(value in monitor['config']['host'])
+
     def test_monitor_is_match(self):
         provider = Ns1Provider('test', 'api-key')
 
@@ -1305,6 +1333,41 @@ class TestNs1ProviderDynamic(TestCase):
                 {'regions': ['lga', 'sin']}, {'regions': ['sin', 'lga']}
             )
         )
+
+    def test_unsupported_healthcheck_protocol(self):
+        provider = Ns1Provider('test', 'api-key')
+        desired = Zone('unit.tests.', [])
+        record = Record.new(
+            desired,
+            'a',
+            {
+                'ttl': 30,
+                'type': 'A',
+                'value': '1.2.3.4',
+                'dynamic': {
+                    'pools': {
+                        'one': {'values': [{'value': '1.2.3.4'}]},
+                        'two': {'values': [{'value': '2.2.3.4'}]},
+                    },
+                    'rules': [
+                        {'geos': ['EU', 'NA-CA-NB', 'NA-US-OR'], 'pool': 'two'},
+                        {'pool': 'one'},
+                    ],
+                },
+                'octodns': {'healthcheck': {'protocol': 'UDP'}},
+            },
+            lenient=True,
+        )
+        desired.add_record(record)
+        with self.assertRaises(SupportsException) as ctx:
+            provider._process_desired_zone(desired)
+        self.assertEqual(
+            'test: healthcheck protocol "UDP" not supported', str(ctx.exception)
+        )
+
+        record.octodns['healthcheck']['protocol'] = 'ICMP'
+        got = provider._process_desired_zone(desired)
+        self.assertEqual(got.records, desired.records)
 
     @patch('octodns_ns1.Ns1Provider._feed_create')
     @patch('octodns_ns1.Ns1Provider._monitor_delete')

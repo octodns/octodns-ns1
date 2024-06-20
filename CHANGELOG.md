@@ -1,6 +1,7 @@
 ## v0.0.8 - 2024-??-?? - 
 
 * DNAME, DS, and TLSA record type support added.
+* Validate that healthcheck protocol is supported (HTTP, HTTPS, ICMP, TCP)
 
 ## v0.0.7 - 2023-11-14 - Maintenance release
 

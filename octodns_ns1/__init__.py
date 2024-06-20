@@ -12,7 +12,7 @@ from uuid import uuid4
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
 
-from octodns.provider import ProviderException
+from octodns.provider import ProviderException, SupportsException
 from octodns.provider.base import BaseProvider
 from octodns.record import Create, Record, Update
 from octodns.record.geo import GeoCodes
@@ -1029,6 +1029,17 @@ class Ns1Provider(BaseProvider):
         )
         return exists
 
+    def _process_desired_zone(self, desired):
+        for record in desired.records:
+            if getattr(record, 'dynamic', False):
+                protocol = record.healthcheck_protocol
+                if protocol not in ('HTTP', 'HTTPS', 'ICMP', 'TCP'):
+                    msg = f'healthcheck protocol "{protocol}" not supported'
+                    # no workable fallbacks so straight error
+                    raise SupportsException(f'{self.id}: {msg}')
+
+        return super()._process_desired_zone(desired)
+
     def _params_for_geo_A(self, record):
         # purposefully set non-geo answers to have an empty meta,
         # so that we know we did this on purpose if/when troubleshooting
@@ -1235,7 +1246,17 @@ class Ns1Provider(BaseProvider):
         connect_timeout = self._healthcheck_connect_timeout(record)
         response_timeout = self._healthcheck_response_timeout(record)
 
-        if record.healthcheck_protocol == 'TCP' or not self.use_http_monitors:
+        healthcheck_protocol = record.healthcheck_protocol
+        if healthcheck_protocol == 'ICMP':
+            ret['job_type'] = 'ping'
+            ret['config'] = {
+                'count': 4,
+                'host': value,
+                'interval': response_timeout * 250,  # 1/4 response_timeout
+                'ipv6': _type == 'AAAA',
+                'timeout': response_timeout * 1000,
+            }
+        elif healthcheck_protocol == 'TCP' or not self.use_http_monitors:
             ret['job_type'] = 'tcp'
             ret['config'] = {
                 'host': value,
@@ -1243,10 +1264,10 @@ class Ns1Provider(BaseProvider):
                 # TCP monitors use milliseconds, so convert from seconds to milliseconds
                 'connect_timeout': connect_timeout * 1000,
                 'response_timeout': response_timeout * 1000,
-                'ssl': record.healthcheck_protocol == 'HTTPS',
+                'ssl': healthcheck_protocol == 'HTTPS',
             }
 
-            if record.healthcheck_protocol != 'TCP':
+            if healthcheck_protocol != 'TCP':
                 # legacy HTTP-emulating TCP monitor
                 # we need to send the HTTP request string
                 path = record.healthcheck_path
@@ -1268,7 +1289,7 @@ class Ns1Provider(BaseProvider):
         else:
             # modern HTTP monitor
             ret['job_type'] = 'http'
-            proto = record.healthcheck_protocol.lower()
+            proto = healthcheck_protocol.lower()
             domain = f'[{value}]' if _type == 'AAAA' else value
             port = record.healthcheck_port
             path = record.healthcheck_path
