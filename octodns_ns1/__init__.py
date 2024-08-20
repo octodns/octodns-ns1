@@ -22,6 +22,9 @@ from octodns.record.geo_data import geo_data
 __version__ = __VERSION__ = '0.0.7'
 
 
+from pprint import pprint
+
+
 def _ensure_endswith_dot(string):
     return string if string.endswith('.') else f'{string}.'
 
@@ -85,6 +88,7 @@ class Ns1Client(object):
         self._notifylists = client.notifylists()
         self._datasource = client.datasource()
         self._datafeed = client.datafeed()
+        self._redirects = client.redirects()
 
         self.reset_caches()
 
@@ -95,6 +99,7 @@ class Ns1Client(object):
         self._notifylists_cache = None
         self._zones_cache = {}
         self._records_cache = {}
+        self._redirects_cache = None
 
     def update_record_cache(func):
         def call(self, zone, domain, _type, **params):
@@ -128,6 +133,15 @@ class Ns1Client(object):
                 cached[_type] = func(self, zone, domain, _type)
 
             return cached[_type]
+
+        return call
+
+    def read_or_set_redirect_cache(func):
+        def call(self):
+            if self._redirects_cache is None:
+                self._redirects_cache = func(self)
+
+            return self._redirects_cache
 
         return call
 
@@ -253,6 +267,13 @@ class Ns1Client(object):
     @update_record_cache
     def records_update(self, zone, domain, _type, **params):
         return self._try(self._records.update, zone, domain, _type, **params)
+
+    @read_or_set_redirect_cache
+    def redirects_list(self):
+        by_fqdn = defaultdict(list)
+        for redirect in self._try(self._redirects.list)['results']:
+            by_fqdn[redirect['domain']].append(redirect)
+        return by_fqdn
 
     def zones_create(self, name):
         self._zones_cache[name] = self._try(self._zones.create, name)
@@ -925,6 +946,27 @@ class Ns1Provider(BaseProvider):
             )
         return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
+    def _data_for_REDIRECT(self, _type, redirects):
+        values = []
+        for redirect in redirects:
+            value = {
+                'path': redirect['path'],
+                'target': redirect['target'],
+            }
+            forwarding_type = redirect['forwarding_type']
+            if forwarding_type == 'masking':
+                value['code'] = 0
+                value['masking'] = 1
+            elif forwarding_type == 'temporary':
+                value['code'] = 302
+                value['masking'] = 1
+            else:
+                value['code'] = 301
+                value['masking'] = 1
+            value['query'] = 1 if redirect['query_forwarding'] else 0
+            values.append(value)
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
+
     def _data_for_DS(self, _type, record):
         values = []
         for answer in record['short_answers']:
@@ -1016,11 +1058,32 @@ class Ns1Provider(BaseProvider):
             _type = record['type']
             if _type not in self.SUPPORTS:
                 continue
+            if _type == 'URLFWD':
+                pprint({
+                    'rec': record
+                })
             data_for = getattr(self, f'_data_for_{_type}')
             name = zone.hostname_from_fqdn(record['domain'])
             data = data_for(_type, record)
             record = Record.new(zone, name, data, source=self, lenient=lenient)
             zone_hash[(_type, name)] = record
+
+        # now we need to add any redirects
+        pprint({
+            'r': self._client.redirects_list()
+        })
+        for domain, redirects in self._client.redirects_list().items():
+            if zone.owns('URLFWD', domain):
+                data = self._data_for_REDIRECT('URLFWD', redirects)
+                record = Record.new(zone, name, data, source=self, lenient=lenient)
+                zone_hash[('URLFWD', domain)] = record
+
+        redirects = self._find_redirects(zone)
+        pprint({
+            'owned': redirects,
+        })
+
+
         [zone.add_record(r, lenient=lenient) for r in zone_hash.values()]
         self.log.info(
             'populate:   found %s records, exists=%s',
