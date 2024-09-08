@@ -1334,6 +1334,38 @@ class TestNs1ProviderDynamic(TestCase):
             )
         )
 
+    def test_unsupported_continent(self):
+        provider = Ns1Provider('test', 'api-key')
+        desired = Zone('unit.tests.', [])
+        record = Record.new(
+            desired,
+            'a',
+            {
+                'ttl': 30,
+                'type': 'A',
+                'value': '1.2.3.4',
+                'dynamic': {
+                    'pools': {
+                        'one': {'values': [{'value': '1.2.3.4'}]},
+                        'two': {'values': [{'value': '2.2.3.4'}]},
+                    },
+                    'rules': [{'geos': ['AN'], 'pool': 'two'}, {'pool': 'one'}],
+                },
+            },
+            lenient=True,
+        )
+        desired.add_record(record)
+        with self.assertRaises(SupportsException) as ctx:
+            provider._process_desired_zone(desired)
+        self.assertEqual(
+            'test: unsupported continent code AN in a.unit.tests.',
+            str(ctx.exception),
+        )
+
+        record.dynamic.rules[0].data['geos'][0] = 'NA'
+        got = provider._process_desired_zone(desired)
+        self.assertEqual(got.records, desired.records)
+
     def test_unsupported_healthcheck_protocol(self):
         provider = Ns1Provider('test', 'api-key')
         desired = Zone('unit.tests.', [])

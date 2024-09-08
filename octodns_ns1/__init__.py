@@ -1038,6 +1038,17 @@ class Ns1Provider(BaseProvider):
                     # no workable fallbacks so straight error
                     raise SupportsException(f'{self.id}: {msg}')
 
+                # validate supported geos
+                for rule in record.dynamic.rules:
+                    for geo in rule.data.get('geos', []):
+                        if (
+                            len(geo) == 2
+                            and geo not in self._REGION_TO_CONTINENT.values()
+                        ):
+                            msg = f'unsupported continent code {geo} in {record.fqdn}'
+                            # no workable fallbacks so straight error
+                            raise SupportsException(f'{self.id}: {msg}')
+
         return super()._process_desired_zone(desired)
 
     def _params_for_geo_A(self, record):
