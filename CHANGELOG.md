@@ -2,6 +2,7 @@
 
 * DNAME, DS, and TLSA record type support added.
 * Validate that healthcheck protocol is supported (HTTP, HTTPS, ICMP, TCP)
+* Validate that continent is supported (Antarctica is supported by octoDNS but not by NS1)
 
 ## v0.0.7 - 2023-11-14 - Maintenance release
 
