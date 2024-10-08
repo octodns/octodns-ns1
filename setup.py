@@ -55,7 +55,7 @@ setup(
     long_description_content_type='text/markdown',
     name='octodns-ns1',
     packages=find_packages(),
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     tests_require=tests_require,
     url='https://github.com/octodns/octodns-ns1',
     version=version(),
