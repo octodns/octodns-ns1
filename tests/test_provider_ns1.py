@@ -10,7 +10,7 @@ from ns1.rest.errors import AuthException, RateLimitException, ResourceException
 
 from octodns.provider import SupportsException
 from octodns.provider.plan import Plan
-from octodns.record import Delete, Record, Update
+from octodns.record import Record, Update
 from octodns.zone import Zone
 
 from octodns_ns1 import Ns1Client, Ns1Exception, Ns1Provider
@@ -32,19 +32,6 @@ class TestNs1Provider(TestCase):
                 'ttl': 33,
                 'type': 'A',
                 'values': ['1.2.3.4', '1.2.3.5'],
-                'meta': {},
-            },
-        )
-    )
-    expected.add(
-        Record.new(
-            zone,
-            'geo',
-            {
-                'ttl': 34,
-                'type': 'A',
-                'values': ['101.102.103.104', '101.102.103.105'],
-                'geo': {'NA-US-NY': ['201.202.203.204']},
                 'meta': {},
             },
         )
@@ -241,12 +228,6 @@ class TestNs1Provider(TestCase):
             'domain': 'foo.unit.tests.',
         },
         {
-            'type': 'A',
-            'ttl': 34,
-            'short_answers': ['101.102.103.104', '101.102.103.105'],
-            'domain': 'geo.unit.tests',
-        },
-        {
             'type': 'CNAME',
             'ttl': 34,
             'short_answers': ['foo.unit.tests'],
@@ -371,51 +352,24 @@ class TestNs1Provider(TestCase):
         self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
         self.assertFalse(exists)
 
-        geo_record = {
-            "domain": "geo.unit.tests",
-            "zone": "unit.tests",
-            "type": "A",
-            "answers": [
-                {'answer': ['1.1.1.1'], 'meta': {}},
-                {'answer': ['1.2.3.4'], 'meta': {'ca_province': ['ON']}},
-                {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
-                {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
-                {
-                    'answer': ['4.5.6.7'],
-                    'meta': {'iso_region_code': ['NA-US-WA']},
-                },
-            ],
-            'tier': 3,
-            'ttl': 34,
-        }
-
         # Existing zone w/o records
         reset()
-        ns1_zone = {'records': [geo_record]}
+        ns1_zone = {'records': []}
         zone_retrieve_mock.side_effect = [ns1_zone]
-        # Its tier 3 so we'll do a full lookup
-        record_retrieve_mock.side_effect = [geo_record]
         zone = Zone('unit.tests.', [])
         provider.populate(zone)
-        self.assertEqual(1, len(zone.records))
-        self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
-        record_retrieve_mock.assert_has_calls(
-            [call('unit.tests', 'geo.unit.tests', 'A')]
-        )
+        self.assertEqual(0, len(zone.records))
 
         # Existing zone w/records
         reset()
-        ns1_zone = {'records': self.ns1_records + [geo_record]}
+        ns1_zone = {'records': self.ns1_records}
         zone_retrieve_mock.side_effect = [ns1_zone]
-        # Its tier 3 so we'll do a full lookup
-        record_retrieve_mock.side_effect = [geo_record]
         zone = Zone('unit.tests.', [])
         provider.populate(zone)
+        from pprint import pprint
+
+        pprint({'expected': self.expected, 'records': zone.records})
         self.assertEqual(self.expected, zone.records)
-        self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
-        record_retrieve_mock.assert_has_calls(
-            [call('unit.tests', 'geo.unit.tests', 'A')]
-        )
 
         # Test skipping unsupported record type
         reset()
@@ -427,19 +381,13 @@ class TestNs1Provider(TestCase):
                     'ttl': 42,
                     'short_answers': ['unsupported'],
                     'domain': 'unsupported.unit.tests.',
-                },
-                geo_record,
+                }
             ]
         }
         zone_retrieve_mock.side_effect = [ns1_zone]
-        record_retrieve_mock.side_effect = [geo_record]
         zone = Zone('unit.tests.', [])
         provider.populate(zone)
         self.assertEqual(self.expected, zone.records)
-        self.assertEqual(('unit.tests',), zone_retrieve_mock.call_args[0])
-        record_retrieve_mock.assert_has_calls(
-            [call('unit.tests', 'geo.unit.tests', 'A')]
-        )
 
         # Test handling of record with unsupported filter chains
         # cc https://github.com/octodns/octodns-ns1/issues/17
@@ -649,53 +597,20 @@ class TestNs1Provider(TestCase):
                     'ttl': 42,
                     'short_answers': ['9.9.9.9'],
                     'domain': 'delete-me.unit.tests.',
-                },
-                {
-                    "domain": "geo.unit.tests",
-                    "zone": "unit.tests",
-                    "type": "A",
-                    "short_answers": [
-                        '1.1.1.1',
-                        '1.2.3.4',
-                        '2.3.4.5',
-                        '3.4.5.6',
-                        '4.5.6.7',
-                    ],
-                    'tier': 3,  # This flags it as advacned, full load required
-                    'ttl': 34,
-                },
+                }
             ]
         }
         ns1_zone['records'][0]['short_answers'][0] = '2.2.2.2'
 
-        ns1_record = {
-            "domain": "geo.unit.tests",
-            "zone": "unit.tests",
-            "type": "A",
-            "answers": [
-                {'answer': ['1.1.1.1'], 'meta': {}},
-                {'answer': ['1.2.3.4'], 'meta': {'ca_province': ['ON']}},
-                {'answer': ['2.3.4.5'], 'meta': {'us_state': ['NY']}},
-                {'answer': ['3.4.5.6'], 'meta': {'country': ['US']}},
-                {
-                    'answer': ['4.5.6.7'],
-                    'meta': {'iso_region_code': ['NA-US-WA']},
-                },
-            ],
-            'tier': 3,
-            'ttl': 34,
-        }
-
-        record_retrieve_mock.side_effect = [ns1_record, ns1_record]
+        # record_retrieve_mock.side_effect = [ns1_record, ns1_record]
         zone_retrieve_mock.side_effect = [ns1_zone, ns1_zone]
         plan = provider.plan(desired)
-        self.assertEqual(3, len(plan.changes))
+        self.assertEqual(2, len(plan.changes))
         # Shouldn't rely on order so just count classes
         classes = defaultdict(lambda: 0)
         for change in plan.changes:
             classes[change.__class__] += 1
-        self.assertEqual(1, classes[Delete])
-        self.assertEqual(2, classes[Update])
+        self.assertEqual(1, classes[Update])
 
         record_update_mock.side_effect = [
             RateLimitException('one', period=0),
@@ -708,10 +623,9 @@ class TestNs1Provider(TestCase):
             None,
         ]
 
-        record_retrieve_mock.side_effect = [ns1_record, ns1_record]
         zone_retrieve_mock.side_effect = [ns1_zone, ns1_zone]
         got_n = provider.apply(plan)
-        self.assertEqual(3, got_n)
+        self.assertEqual(2, got_n)
 
         record_update_mock.assert_has_calls(
             [
@@ -733,25 +647,6 @@ class TestNs1Provider(TestCase):
                     regions={},
                     ttl=32,
                 ),
-                call(
-                    'unit.tests',
-                    'geo.unit.tests',
-                    'A',
-                    answers=[
-                        {'answer': ['101.102.103.104'], 'meta': {}},
-                        {'answer': ['101.102.103.105'], 'meta': {}},
-                        {
-                            'answer': ['201.202.203.204'],
-                            'meta': {'iso_region_code': ['NA-US-NY']},
-                        },
-                    ],
-                    filters=[
-                        {'filter': 'shuffle', 'config': {}},
-                        {'filter': 'geotarget_country', 'config': {}},
-                        {'filter': 'select_first_n', 'config': {'N': 1}},
-                    ],
-                    ttl=34,
-                ),
             ]
         )
 
@@ -760,7 +655,7 @@ class TestNs1Provider(TestCase):
         record = {'ttl': 31, 'short_answers': ['foo; bar baz; blip']}
         self.assertEqual(
             ['foo\\; bar baz\\; blip'],
-            provider._data_for_SPF('SPF', record)['values'],
+            provider._data_for_TXT('TXT', record)['values'],
         )
 
         record = {
@@ -775,10 +670,10 @@ class TestNs1Provider(TestCase):
         zone = Zone('unit.tests.', [])
         record = Record.new(
             zone,
-            'spf',
-            {'ttl': 34, 'type': 'SPF', 'value': 'foo\\; bar baz\\; blip'},
+            'txt',
+            {'ttl': 34, 'type': 'TXT', 'value': 'foo\\; bar baz\\; blip'},
         )
-        params, _ = provider._params_for_SPF(record)
+        params, _ = provider._params_for_TXT(record)
         self.assertEqual(['foo; bar baz; blip'], params['answers'])
 
         record = Record.new(
@@ -786,7 +681,7 @@ class TestNs1Provider(TestCase):
             'txt',
             {'ttl': 35, 'type': 'TXT', 'value': 'foo\\; bar baz\\; blip'},
         )
-        params, _ = provider._params_for_SPF(record)
+        params, _ = provider._params_for_TXT(record)
         self.assertEqual(['foo; bar baz; blip'], params['answers'])
 
     def test_data_for_CNAME(self):
@@ -1143,24 +1038,24 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertFalse(monitor['config']['ssl'])
         self.assertEqual('host:unit.tests type:A', monitor['notes'])
 
-        record._octodns['healthcheck']['host'] = None
+        record.octodns['healthcheck']['host'] = None
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(r'\nHost: 3.4.5.6\r' in monitor['config']['send'])
 
         # Test http version validation
-        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
+        record.octodns['ns1']['healthcheck']['http_version'] = 'invalid'
         with self.assertRaisesRegex(
             Ns1Exception,
             r"unsupported http version found: 'invalid'. Expected version in \('HTTP/1.0', 'HTTP/1.1'\)",
         ):
             provider._monitor_gen(record, value)
-        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
+        record.octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
 
-        record._octodns['healthcheck']['protocol'] = 'HTTPS'
+        record.octodns['healthcheck']['protocol'] = 'HTTPS'
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(monitor['config']['ssl'])
 
-        record._octodns['healthcheck']['protocol'] = 'TCP'
+        record.octodns['healthcheck']['protocol'] = 'TCP'
         monitor = provider._monitor_gen(record, value)
         self.assertEqual('tcp', monitor['job_type'])
         # No http send done
@@ -1168,23 +1063,23 @@ class TestNs1ProviderDynamic(TestCase):
         # No http response expected
         self.assertFalse('rules' in monitor)
 
-        record._octodns['ns1']['healthcheck']['policy'] = 'all'
+        record.octodns['ns1']['healthcheck']['policy'] = 'all'
         monitor = provider._monitor_gen(record, value)
         self.assertEqual('all', monitor['policy'])
 
-        record._octodns['ns1']['healthcheck']['frequency'] = 300
+        record.octodns['ns1']['healthcheck']['frequency'] = 300
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(300, monitor['frequency'])
 
-        record._octodns['ns1']['healthcheck']['rapid_recheck'] = True
+        record.octodns['ns1']['healthcheck']['rapid_recheck'] = True
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(monitor['rapid_recheck'])
 
-        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        record.octodns['ns1']['healthcheck']['connect_timeout'] = 1
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(1000, monitor['config']['connect_timeout'])
 
-        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        record.octodns['ns1']['healthcheck']['response_timeout'] = 2
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2000, monitor['config']['response_timeout'])
 
@@ -1201,28 +1096,28 @@ class TestNs1ProviderDynamic(TestCase):
             f'host:unit.tests type:A value:{value}', monitor['notes']
         )
 
-        record._octodns['healthcheck']['host'] = None
+        record.octodns['healthcheck']['host'] = None
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(value, monitor['config']['virtual_host'])
 
-        record._octodns['healthcheck']['protocol'] = 'HTTPS'
+        record.octodns['healthcheck']['protocol'] = 'HTTPS'
         monitor = provider._monitor_gen(record, value)
         self.assertTrue(monitor['config']['url'].startswith('https://'))
 
         # http version doesn't matter or fail
-        record._octodns['ns1']['healthcheck']['http_version'] = 'invalid'
+        record.octodns['ns1']['healthcheck']['http_version'] = 'invalid'
         provider._monitor_gen(record, value)
-        record._octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
+        record.octodns['ns1']['healthcheck']['http_version'] = 'HTTP/1.0'
 
-        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        record.octodns['ns1']['healthcheck']['connect_timeout'] = 1
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(1, monitor['config']['connect_timeout'])
 
-        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        record.octodns['ns1']['healthcheck']['response_timeout'] = 2
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2, monitor['config']['idle_timeout'])
 
-        record._octodns['healthcheck']['protocol'] = 'TCP'
+        record.octodns['healthcheck']['protocol'] = 'TCP'
         monitor = provider._monitor_gen(record, value)
         self.assertEqual('tcp', monitor['job_type'])
         # Nothing to send
@@ -1230,11 +1125,11 @@ class TestNs1ProviderDynamic(TestCase):
         # Nothing to expect
         self.assertFalse('rules' in monitor)
 
-        record._octodns['ns1']['healthcheck']['connect_timeout'] = 1
+        record.octodns['ns1']['healthcheck']['connect_timeout'] = 1
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(1000, monitor['config']['connect_timeout'])
 
-        record._octodns['ns1']['healthcheck']['response_timeout'] = 2
+        record.octodns['ns1']['healthcheck']['response_timeout'] = 2
         monitor = provider._monitor_gen(record, value)
         self.assertEqual(2000, monitor['config']['response_timeout'])
 
@@ -1260,7 +1155,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         value = '1.2.3.4'
         record = self.record()
-        record._octodns['healthcheck']['protocol'] = 'ICMP'
+        record.octodns['healthcheck']['protocol'] = 'ICMP'
         monitor = provider._monitor_gen(record, value)
         self.assertEqual('ping', monitor['job_type'])
         self.assertEqual(
@@ -1276,7 +1171,7 @@ class TestNs1ProviderDynamic(TestCase):
 
         value = '::ffff:3.4.5.6'
         record = self.aaaa_record()
-        record._octodns['healthcheck']['protocol'] = 'ICMP'
+        record.octodns['healthcheck']['protocol'] = 'ICMP'
         monitor = provider._monitor_gen(record, value)
         self.assertEqual('ping', monitor['job_type'])
         self.assertTrue(monitor['config']['ipv6'])
@@ -2167,20 +2062,6 @@ class TestNs1ProviderDynamic(TestCase):
             ]
         )
 
-        record = Record.new(
-            self.zone,
-            'geo',
-            {
-                'ttl': 34,
-                'type': 'A',
-                'values': ['101.102.103.104', '101.102.103.105'],
-                'geo': {'EU': ['201.202.203.204']},
-                'meta': {},
-            },
-        )
-        params, _ = provider._params_for_geo_A(record)
-        self.assertEqual([], params['filters'])
-
     @patch('octodns_ns1.Ns1Provider._monitor_sync')
     @patch('octodns_ns1.Ns1Provider._monitors_for')
     def test_params_for_dynamic_CNAME(
@@ -2769,7 +2650,7 @@ class TestNs1ProviderDynamic(TestCase):
         # change the healthcheck protocol, we'll still
         # expect to see an update
         reset()
-        dynamic._octodns['healthcheck']['protocol'] = 'HTTPS'
+        dynamic.octodns['healthcheck']['protocol'] = 'HTTPS'
         monitors_for_mock.side_effect = [{'1.2.3.4': gend}]
         extra = provider._extra_changes(desired, [])
         self.assertEqual(1, len(extra))
@@ -2777,7 +2658,7 @@ class TestNs1ProviderDynamic(TestCase):
         self.assertIsInstance(extra, Update)
         self.assertEqual(dynamic, extra.new)
         monitors_for_mock.assert_has_calls([call(dynamic)])
-        dynamic._octodns['healthcheck']['protocol'] = 'HTTP'
+        dynamic.octodns['healthcheck']['protocol'] = 'HTTP'
 
         # Expect to see an update from TCP to HTTP monitor/job_type
         ## no change if use_http_monitors=False (default)

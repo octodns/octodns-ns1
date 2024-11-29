@@ -1,8 +1,18 @@
-## v0.0.8 - 2024-??-?? - 
+## v1.0.0 - 2024-??-?? -
 
+### Notedworthy Changes:
+
+* `geo` record support removed, records should be migrated to `dynamic` before
+  upgrading.
+* `SPF` record support removed, records should be migrated to `TXT` before
+  upgrading.
 * DNAME, DS, and TLSA record type support added.
+
+### Other Changes:
+
 * Validate that healthcheck protocol is supported (HTTP, HTTPS, ICMP, TCP)
 * Validate that continent is supported (Antarctica is supported by octoDNS but not by NS1)
+* Address pending octoDNS 2.x deprecations, require minimum of 1.5.x
 
 ## v0.0.7 - 2023-11-14 - Maintenance release
 
