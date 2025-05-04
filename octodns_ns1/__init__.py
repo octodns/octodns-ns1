@@ -2,7 +2,7 @@
 #
 #
 
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from collections.abc import Mapping
 from itertools import chain
 from logging import getLogger
@@ -581,43 +581,6 @@ class Ns1Provider(BaseProvider):
                 data[k] = v if v != '' else None
         return data
 
-    def _data_for_geo_A(self, _type, record):
-        # record meta (which would include geo information is only
-        # returned when getting a record's detail, not from zone detail
-        geo = defaultdict(list)
-        data = {'ttl': record['ttl'], 'type': _type}
-        values, codes = [], []
-        for answer in record.get('answers', []):
-            meta = answer.get('meta', {})
-            if meta:
-                # country + state and country + province are allowed
-                # in that case though, supplying a state/province would
-                # be redundant since the country would supercede in when
-                # resolving the record.  it is syntactically valid, however.
-                country = meta.get('country', [])
-                us_state = meta.get('us_state', [])
-                ca_province = meta.get('ca_province', [])
-                for cntry in country:
-                    key = GeoCodes.country_to_code(cntry)
-                    geo[key].extend(answer['answer'])
-                for state in us_state:
-                    key = f'NA-US-{state}'
-                    geo[key].extend(answer['answer'])
-                for province in ca_province:
-                    key = f'NA-CA-{province}'
-                    geo[key].extend(answer['answer'])
-                for code in meta.get('iso_region_code', []):
-                    key = code
-                    geo[key].extend(answer['answer'])
-            else:
-                values.extend(answer['answer'])
-                codes.append([])
-        values = [str(x) for x in values]
-        geo = OrderedDict({str(k): [str(x) for x in v] for k, v in geo.items()})
-        data['values'] = values
-        data['geo'] = geo
-        return data
-
     def _parse_dynamic_pool_name(self, pool_name):
         catchall_prefix = 'catchall__'
         if pool_name.startswith(catchall_prefix):
@@ -800,16 +763,8 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_A(self, _type, record):
         if record.get('tier', 1) > 1:
-            # Advanced record, see if it's first answer has a note
-            try:
-                first_answer_note = record['answers'][0]['meta']['note']
-            except (IndexError, KeyError):
-                first_answer_note = ''
-            # If that note includes a `from` (pool name) it's a dynamic record
-            if 'from:' in first_answer_note:
-                return self._data_for_dynamic(_type, record)
-            # If not it's an old geo record
-            return self._data_for_geo_A(_type, record)
+            # it's a dynamic record
+            return self._data_for_dynamic(_type, record)
 
         # This is a basic record, just convert it
         return {
@@ -1051,37 +1006,6 @@ class Ns1Provider(BaseProvider):
 
         return super()._process_desired_zone(desired)
 
-    def _params_for_geo_A(self, record):
-        # purposefully set non-geo answers to have an empty meta,
-        # so that we know we did this on purpose if/when troubleshooting
-        params = {
-            'answers': [{"answer": [x], "meta": {}} for x in record.values],
-            'ttl': record.ttl,
-        }
-
-        has_country = False
-        for iso_region, target in record.geo.items():
-            key = 'iso_region_code'
-            value = iso_region
-            if not has_country and len(value.split('-')) > 1:
-                has_country = True
-            for answer in target.values:
-                params['answers'].append(
-                    {'answer': [answer], 'meta': {key: [value]}}
-                )
-
-        params['filters'] = []
-        if has_country:
-            params['filters'].append({"filter": "shuffle", "config": {}})
-            params['filters'].append(
-                {"filter": "geotarget_country", "config": {}}
-            )
-            params['filters'].append(
-                {"filter": "select_first_n", "config": {"N": 1}}
-            )
-
-        return params, None
-
     def _monitors_for(self, record):
         monitors = {}
 
@@ -1189,42 +1113,42 @@ class Ns1Provider(BaseProvider):
 
     def _healthcheck_policy(self, record):
         return (
-            record._octodns.get('ns1', {})
+            record.octodns.get('ns1', {})
             .get('healthcheck', {})
             .get('policy', 'quorum')
         )
 
     def _healthcheck_frequency(self, record):
         return (
-            record._octodns.get('ns1', {})
+            record.octodns.get('ns1', {})
             .get('healthcheck', {})
             .get('frequency', 60)
         )
 
     def _healthcheck_rapid_recheck(self, record):
         return (
-            record._octodns.get('ns1', {})
+            record.octodns.get('ns1', {})
             .get('healthcheck', {})
             .get('rapid_recheck', False)
         )
 
     def _healthcheck_connect_timeout(self, record):
         return (
-            record._octodns.get('ns1', {})
+            record.octodns.get('ns1', {})
             .get('healthcheck', {})
             .get('connect_timeout', 2)
         )
 
     def _healthcheck_response_timeout(self, record):
         return (
-            record._octodns.get('ns1', {})
+            record.octodns.get('ns1', {})
             .get('healthcheck', {})
             .get('response_timeout', 10)
         )
 
     def _healthcheck_http_version(self, record):
         http_version = (
-            record._octodns.get("ns1", {})
+            record.octodns.get("ns1", {})
             .get("healthcheck", {})
             .get("http_version", self.default_healthcheck_http_version)
         )
@@ -1667,8 +1591,6 @@ class Ns1Provider(BaseProvider):
     def _params_for_A(self, record):
         if getattr(record, 'dynamic', False):
             return self._params_for_dynamic(record)
-        elif getattr(record, 'geo', False):
-            return self._params_for_geo_A(record)
 
         return {
             'answers': record.values,
