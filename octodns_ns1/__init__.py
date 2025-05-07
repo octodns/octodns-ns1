@@ -763,15 +763,28 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_A(self, _type, record):
         if record.get('tier', 1) > 1:
-            # it's a dynamic record
-            return self._data_for_dynamic(_type, record)
+            # Advanced record, see if it's first answer has a note
+            try:
+                first_answer_note = record['answers'][0]['meta']['note']
+            except (IndexError, KeyError):
+                first_answer_note = ''
+            # If that note includes a `pool` it's a valid dynamic record
+            if 'from:' in first_answer_note:
+                # it's a dynamic record
+                return self._data_for_dynamic(_type, record)
+            # If not, it can't be parsed. Let it be an empty record
+            self.log.warning(
+                'Cannot parse %s dynamic record due to missing '
+                'pool name in first answer note, treating it as '
+                'an empty record',
+                record['domain'],
+            )
+            values = []
+        else:
+            values = [str(x) for x in record['short_answers']]
 
         # This is a basic record, just convert it
-        return {
-            'ttl': record['ttl'],
-            'type': _type,
-            'values': [str(x) for x in record['short_answers']],
-        }
+        return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     _data_for_AAAA = _data_for_A
 
