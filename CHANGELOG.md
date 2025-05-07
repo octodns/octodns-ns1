@@ -1,3 +1,7 @@
+## v1.0.1 - 2025-05-?? -
+
+* Restore handling of tier > 1 advanced A/AAAA records that are not dynamic
+
 ## v1.0.0 - 2025-05-04 - Long overdue 1.?0
 
 ### Notedworthy Changes:
