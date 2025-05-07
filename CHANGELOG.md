@@ -1,4 +1,4 @@
-## v1.0.1 - 2025-05-?? -
+## v1.0.1 - 2025-05-07 - Fix the edges
 
 * Restore handling of tier > 1 advanced A/AAAA records that are not dynamic
 
