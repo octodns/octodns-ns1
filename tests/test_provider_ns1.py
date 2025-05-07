@@ -2411,6 +2411,47 @@ class TestNs1ProviderDynamic(TestCase):
             data,
         )
 
+    def test_data_for_A_non_dynamic(self):
+        provider = Ns1Provider('test', 'api-key')
+
+        # empty note
+        ns1_record = {
+            'answers': [
+                {
+                    'answer': ['iad.unit.tests.'],
+                    'meta': {'priority': 1, 'weight': 12, 'note': '', 'up': {}},
+                    'region': None,
+                }
+            ],
+            'domain': 'foo.unit.tests',
+            'filters': None,
+            'regions': None,
+            'tier': 3,
+            'ttl': 43,
+            'type': 'A',
+        }
+        data = provider._data_for_A('A', ns1_record)
+        self.assertEqual({'ttl': 43, 'type': 'A', 'values': []}, data)
+
+        # no note
+        ns1_record = {
+            'answers': [
+                {
+                    'answer': ['iad.unit.tests.'],
+                    'meta': {'priority': 1, 'weight': 12, 'up': {}},
+                    'region': None,
+                }
+            ],
+            'domain': 'foo.unit.tests',
+            'filters': None,
+            'regions': None,
+            'tier': 3,
+            'ttl': 43,
+            'type': 'A',
+        }
+        data = provider._data_for_A('A', ns1_record)
+        self.assertEqual({'ttl': 43, 'type': 'A', 'values': []}, data)
+
     def test_data_for_dynamic_CNAME(self):
         provider = Ns1Provider('test', 'api-key')
 
