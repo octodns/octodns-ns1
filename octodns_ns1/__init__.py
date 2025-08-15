@@ -789,7 +789,12 @@ class Ns1Provider(BaseProvider):
     _data_for_AAAA = _data_for_A
 
     def _data_for_SPF(self, _type, record):
-        values = [v.replace(';', '\\;') for v in record['short_answers']]
+        try:
+            values = [v.replace(';', '\\;') for v in record['short_answers']]
+        except KeyError:
+            # some TXT records don't have short_answers, (filterchain records have no answers)
+            values = []
+
         return {'ttl': record['ttl'], 'type': _type, 'values': values}
 
     _data_for_TXT = _data_for_SPF

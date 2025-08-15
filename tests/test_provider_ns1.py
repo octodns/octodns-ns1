@@ -658,6 +658,9 @@ class TestNs1Provider(TestCase):
             provider._data_for_TXT('TXT', record)['values'],
         )
 
+        record = {'ttl': 31}
+        self.assertEqual([], provider._data_for_TXT('TXT', record)['values'])
+
         record = {
             'ttl': 31,
             'short_answers': ['no', 'foo; bar baz; blip', 'yes'],
