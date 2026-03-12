@@ -845,7 +845,7 @@ class Ns1Provider(BaseProvider):
     def _data_for_NAPTR(self, _type, record):
         values = []
         for answer in record['short_answers']:
-            (order, preference, flags, service, regexp, replacement) = (
+            order, preference, flags, service, regexp, replacement = (
                 answer.split(' ', 5)
             )
             values.append(
