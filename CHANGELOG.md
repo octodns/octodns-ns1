@@ -1,3 +1,9 @@
+## 1.0.2 - 2026-04-03
+
+Patch:
+* change-description fixed bug where filterchain TXT record had no short_answers variable, causing a crash in _data_for_SPF - [#98](https://github.com/octodns/octodns-ns1/pull/98)
+* Use new [changelet](https://github.com/octodns/changelet) tooling - [#97](https://github.com/octodns/octodns-ns1/pull/97)
+
 ## v1.0.1 - 2025-05-07 - Fix the edges
 
 * Restore handling of tier > 1 advanced A/AAAA records that are not dynamic
