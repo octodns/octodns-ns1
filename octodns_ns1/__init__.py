@@ -285,7 +285,7 @@ class Ns1Client(object):
                 sleep(period)
                 tries -= 1
             except ResourceException as e:
-                if not e.response or e.response.status_code != 404:
+                if e.response is None or e.response.status_code != 404:
                     self.log.exception(
                         "_try: method=%s, args=%s, response=%s, body=%s",
                         method.__name__,

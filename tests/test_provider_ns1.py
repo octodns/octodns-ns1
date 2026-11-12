@@ -7,6 +7,7 @@ from unittest import TestCase
 from unittest.mock import call, patch
 
 from ns1.rest.errors import AuthException, RateLimitException, ResourceException
+from requests import Response
 
 from octodns.provider import SupportsException
 from octodns.provider.plan import Plan
@@ -2900,6 +2901,32 @@ class TestNs1ProviderDynamic(TestCase):
 
 
 class TestNs1Client(TestCase):
+    @patch('ns1.rest.zones.Zones.retrieve')
+    def test_resource_exception_logging(self, zone_retrieve_mock):
+        client = Ns1Client('dummy-key')
+        zone_retrieve_mock.__name__ = 'retrieve'
+
+        for status_code in (404, 500, None):
+            with self.subTest(status_code=status_code):
+                response = None
+                if status_code is not None:
+                    response = Response()
+                    response.status_code = status_code
+                error = ResourceException('server error', response=response)
+                zone_retrieve_mock.reset_mock()
+                zone_retrieve_mock.side_effect = error
+
+                with patch.object(client.log, 'exception') as log_mock:
+                    with self.assertRaises(ResourceException) as ctx:
+                        client.zones_retrieve('unit.tests')
+
+                    self.assertIs(error, ctx.exception)
+                    zone_retrieve_mock.assert_called_once_with('unit.tests')
+                    if status_code == 404:
+                        log_mock.assert_not_called()
+                    else:
+                        log_mock.assert_called_once()
+
     @patch('ns1.rest.zones.Zones.retrieve')
     def test_retry_behavior(self, zone_retrieve_mock):
         client = Ns1Client('dummy-key')
